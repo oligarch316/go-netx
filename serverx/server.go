@@ -2,131 +2,106 @@ package serverx
 
 import (
 	"context"
-	"sync"
+	"errors"
+	"fmt"
+	"net"
 
 	"github.com/oligarch316/go-netx"
 	"github.com/oligarch316/go-netx/runner"
 )
 
-// Option TODO.
-type Option func(*Server) error
+// ErrNoSuchServiceID TODO.
+var ErrNoSuchServiceID = errors.New("no such service id")
 
 // Server TODO.
 type Server struct {
-	listenerMap map[ServiceID]*netx.MultiListener
+	svcParams serviceParams
+	runGroup  *runner.Group
+}
 
-    listenGroup, serviceGroup *runner.Group
-
-    serveOnce, closeOnce sync.Once
-
-	listenersDone chan struct{}
-	resultChan    chan error
+// Dialer TODO.
+type Dialer interface {
+	Addrs() []netx.MultiAddr
+	Dial(netx.MultiAddr) (net.Conn, error)
+	DialContext(context.Context, netx.MultiAddr) (net.Conn, error)
 }
 
 // NewServer TODO.
 func NewServer(opts ...Option) (*Server, error) {
-	res := &Server{
-		listenerMap:   make(map[ServiceID]*netx.MultiListener),
-
-        listenGroup: runner.NewGroup(),
-        serviceGroup: runner.NewGroup(),
-
-		listenersDone: make(chan struct{}),
-		resultChan:    make(chan error),
-	}
+	var (
+		res    = &Server{svcParams: make(serviceParams)}
+		params = Params{ParamsService: res.svcParams}
+	)
 
 	for _, opt := range opts {
-		if err := opt(res); err != nil {
+		if err := opt(&params); err != nil {
 			return nil, err
 		}
 	}
 
-	return res, nil
-}
-
-// TODO (Thought): If we made a whole separate Params type and did our appending
-// through that, we could ensure appending only occurs during NewServer and
-// avoid worries of appending after Serve()/Close() is called
-
-// AppendListeners TODO.
-func (s *Server) AppendListeners(svcID ServiceID, ls ...netx.Listener) {
-	if ml, ok := s.listenerMap[svcID]; ok {
-		ml.Append(ls...)
-		return
-	}
-
-	s.listenerMap[svcID] = netx.NewMultiListener(ls...)
+	return res, findDependencyCycles(res.svcParams)
 }
 
 // Close TODO.
 func (s *Server) Close(ctx context.Context) {
-    // TODO: This once.Do is very likely unnecessary
-	s.closeOnce.Do(func() { s.close(ctx) })
+	if s.runGroup != nil {
+		s.runGroup.Close(ctx)
+	}
+}
+
+// Dialer TODO.
+func (s *Server) Dialer(id ServiceID) (Dialer, error) {
+	if ml, ok := s.svcParams.mlOk(id); ok {
+		return ml, nil
+	}
+	return nil, fmt.Errorf("%w: %s", ErrNoSuchServiceID, id)
 }
 
 // Serve TODO.
 func (s *Server) Serve(svcs ...Service) <-chan error {
-	s.serveOnce.Do(func() { s.serve(svcs) })
-	return s.resultChan
-}
+	svcMap := make(map[ServiceID]*service)
 
-// Name this run instead?
-func (s *Server) serve(svcs []Service) {
+	// Combine arguments with associated multi listeners to build finalized services
 	for _, svc := range svcs {
-		ml, ok := s.listenerMap[svc.ID()]
+		svcID := svc.ID()
+
+		ml, ok := s.svcParams.mlOk(svcID)
 		if !ok {
+			// Skip those services with no listeners available
+
 			// TODO: Log/track/surface this somehow
 			continue
 		}
 
-		s.listenGroup.Append(ml.Runners()...)
-		s.serviceGroup.Append(serviceRunner{
-			Service: svc,
-			l:       ml,
-		})
+		if _, exists := svcMap[svcID]; exists {
+			// TODO: Log/track/surface this somehow
+		}
+
+		svcMap[svcID] = newService(svc, ml)
 	}
 
-	go s.report()
-    go s.serviceGroup.Run()
-	go s.listenGroup.Run()
-}
+	// Build service dependencies
+	for id, svc := range svcMap {
+		for depID := range s.svcParams[id].deps {
+			depSvc, ok := svcMap[depID]
+			if !ok {
+				// TODO: Log/track/surface this somehow
+				continue
+			}
 
-func (s *Server) fanIn(src <-chan error) {
-	for err := range src {
-		if err != nil {
-			s.resultChan <- err
+			svc.DependOn(depSvc)
 		}
 	}
-}
 
-func (s *Server) report() {
-    // Consume listen runner results until complete
-    s.fanIn(s.listenGroup.Results())
+	// Build the run group from services
+	s.runGroup = runner.NewGroup()
+	for _, svc := range svcMap {
+		s.runGroup.Append(svc.Runners()...)
+	}
 
-    // Signal listening completed
-    close(s.listenersDone)
+	// Start the run group
+	s.runGroup.Run()
 
-    // Consume service runner results until complete
-    s.fanIn(s.serviceGroup.Results())
-
-    // Signal serve completed
-    close(s.resultChan)
-}
-
-func (s *Server) close(ctx context.Context) {
-    // Trigger close of listen runners
-    s.listenGroup.Close(ctx)
-
-    // Wait for 1st of...
-    select {
-    case <-s.listenersDone:
-        // ...listen runner completion
-    case <-ctx.Done():
-        // ...context expiration
-
-        // TODO: Log/track/surface this somehow
-    }
-
-    // Trigger close of service runners
-    s.serviceGroup.Close(ctx)
+	// Return the run group's error channel
+	return s.runGroup.Results()
 }

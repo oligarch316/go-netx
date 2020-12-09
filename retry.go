@@ -1,11 +1,9 @@
 package netx
 
-import (
-    "time"
-)
+import "time"
 
 const (
-    retryDelayMin = 5 * time.Millisecond
+	retryDelayMin = 5 * time.Millisecond
 	retryDelayMax = 1 * time.Second
 )
 
