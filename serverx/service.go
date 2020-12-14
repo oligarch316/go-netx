@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/multi"
 	"github.com/oligarch316/go-netx/runner"
 )
 
@@ -21,13 +21,13 @@ type Service interface {
 
 type service struct {
 	svc Service
-	ml  *netx.MultiListener
+	ml  *multi.Listener
 
 	dependants, dependsOn []*service
 	signal                func()
 }
 
-func newService(svc Service, ml *netx.MultiListener) *service {
+func newService(svc Service, ml *multi.Listener) *service {
 	return &service{svc: svc, ml: ml}
 }
 

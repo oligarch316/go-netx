@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 
-	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/multi"
 	"github.com/oligarch316/go-netx/runner"
 )
 
@@ -17,13 +16,6 @@ var ErrNoSuchServiceID = errors.New("no such service id")
 type Server struct {
 	svcParams serviceParams
 	runGroup  *runner.Group
-}
-
-// Dialer TODO.
-type Dialer interface {
-	Addrs() []netx.MultiAddr
-	Dial(netx.MultiAddr) (net.Conn, error)
-	DialContext(context.Context, netx.MultiAddr) (net.Conn, error)
 }
 
 // NewServer TODO.
@@ -50,7 +42,7 @@ func (s *Server) Close(ctx context.Context) {
 }
 
 // Dialer TODO.
-func (s *Server) Dialer(id ServiceID) (Dialer, error) {
+func (s *Server) Dialer(id ServiceID) (multi.Dialer, error) {
 	if ml, ok := s.svcParams.mlOk(id); ok {
 		return ml, nil
 	}

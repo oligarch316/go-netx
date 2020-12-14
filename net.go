@@ -7,13 +7,20 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-const addrInternal abstractAddr = "internal"
+const (
+	// NetworkNameInternal TODO.
+	NetworkNameInternal = "internal"
 
-type abstractAddr string
+	addrInternal AbstractAddr = NetworkNameInternal
+)
 
-func (aa abstractAddr) Network() string { return string(aa) }
+// AbstractAddr TODO.
+type AbstractAddr string
 
-func (aa abstractAddr) String() string { return string(aa) }
+// Network TODO.
+func (aa AbstractAddr) Network() string { return string(aa) }
+
+func (aa AbstractAddr) String() string { return string(aa) }
 
 // Listener TODO.
 type Listener interface {

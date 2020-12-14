@@ -1,6 +1,9 @@
 package serverx
 
-import "github.com/oligarch316/go-netx"
+import (
+	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/multi"
+)
 
 type (
 	// Option TODO.
@@ -21,13 +24,13 @@ type (
 )
 
 type serviceParam struct {
-	ml   *netx.MultiListener
+	ml   *multi.Listener
 	deps map[ServiceID]struct{}
 }
 
 func (sp *serviceParam) addListeners(ls ...netx.Listener) {
 	if sp.ml == nil {
-		sp.ml = netx.NewMultiListener(ls...)
+		sp.ml = multi.NewListener(ls...)
 		return
 	}
 
@@ -54,7 +57,7 @@ func (sps serviceParams) AddDependencies(id ServiceID, depIDs ...ServiceID) {
 	sps.paramOrNew(id).addDependencies(depIDs...)
 }
 
-func (sps serviceParams) mlOk(id ServiceID) (*netx.MultiListener, bool) {
+func (sps serviceParams) mlOk(id ServiceID) (*multi.Listener, bool) {
 	if param, ok := sps[id]; ok && param.ml != nil {
 		return param.ml, true
 	}
