@@ -15,56 +15,56 @@ const (
 	// NetworkName TODO.
 	NetworkName = "multi"
 
-	addrMerger netx.AbstractAddr = NetworkName
+	addrMergeListener netx.AbstractAddr = NetworkName
 )
 
 var (
-	errListenMergerClosed = errors.New("listener closed")
-	errListenRunnerClosed = errors.New("runner closed")
+	errMergeListenerClosed = errors.New("listener closed")
+	errMergeRunnerClosed = errors.New("runner closed")
 )
 
-type listenMerger struct {
+type mergeListener struct {
 	connChan  chan net.Conn
 	closeChan chan struct{}
 	closeOnce sync.Once
 }
 
-func newListenMerger() listenMerger {
-	return listenMerger{
+func newMergeListener() mergeListener {
+	return mergeListener{
 		connChan:  make(chan net.Conn),
 		closeChan: make(chan struct{}),
 	}
 }
 
-func (lm *listenMerger) runner(l net.Listener) runner.Item {
+func (ml *mergeListener) runner(l net.Listener) runner.Item {
 	return &mergeRunner{
 		l:  l,
-		merger: lm,
+		mergeL: ml,
 
 		doneChan:  make(chan struct{}),
 		closeChan: make(chan struct{}),
 	}
 }
 
-func (lm *listenMerger) Accept() (net.Conn, error) {
+func (ml *mergeListener) Accept() (net.Conn, error) {
 	select {
-	case conn := <-lm.connChan:
+	case conn := <-ml.connChan:
 		return conn, nil
-	case <-lm.closeChan:
-		return nil, errListenMergerClosed
+	case <-ml.closeChan:
+		return nil, errMergeListenerClosed
 	}
 }
 
-func (*listenMerger) Addr() net.Addr { return addrMerger }
+func (*mergeListener) Addr() net.Addr { return addrMergeListener }
 
-func (lm *listenMerger) Close() error {
-	lm.closeOnce.Do(func() { close(lm.closeChan) })
+func (ml *mergeListener) Close() error {
+	ml.closeOnce.Do(func() { close(ml.closeChan) })
 	return nil
 }
 
 type mergeRunner struct {
 	l  net.Listener
-	merger *listenMerger
+	mergeL *mergeListener
 
 	doneChan  chan struct{}
 	closeChan chan struct{}
@@ -94,8 +94,8 @@ func (mr *mergeRunner) Run() error {
 			case <-mr.closeChan:
 				// Runner was closed
 				return nil
-			case <-mr.merger.closeChan:
-				// Target merger was closed
+			case <-mr.mergeL.closeChan:
+				// Target merge listener was closed
 				return nil
 			}
 		}
@@ -103,20 +103,20 @@ func (mr *mergeRunner) Run() error {
 		delay.Reset()
 
 		select {
-		case mr.merger.connChan <- conn:
+		case mr.mergeL.connChan <- conn:
 			// Connection was successfully handed off, continue
 		case <-mr.closeChan:
 			// Runner was closed
 			if err := conn.Close(); err != nil {
 				// TODO: Log/track/surface this somehow
 			}
-			return fmt.Errorf("unprocessed connection: %w", errListenRunnerClosed)
-		case <-mr.merger.closeChan:
-			// Target merger was closed
+			return fmt.Errorf("unprocessed connection: %w", errMergeRunnerClosed)
+		case <-mr.mergeL.closeChan:
+			// Target merge listener was closed
 			if err := conn.Close(); err != nil {
 				// TODO: Log/track/surface this somehow
 			}
-			return fmt.Errorf("unprocessed connection: %w", errListenMergerClosed)
+			return fmt.Errorf("unprocessed connection: %w", errMergeListenerClosed)
 		}
 	}
 }
@@ -129,6 +129,10 @@ func (mr *mergeRunner) Close(ctx context.Context) error {
 	case <-ctx.Done():
 		// TODO: Log/track/surface this somehow
 		close(mr.closeChan)
+
+		// TODO: Is this wait on the doneChan not overkill?
+		// Aren't Close functions of Runners expected to be fire and forget...
+		// (specifically the runner.Group is doing this close and re-wait logic for us already)
 		<-mr.doneChan
 	}
 
@@ -137,14 +141,14 @@ func (mr *mergeRunner) Close(ctx context.Context) error {
 
 // Listener TODO.
 type Listener struct {
-	listenMerger
+	mergeListener
 	set
 }
 
 // NewListener TODO.
 func NewListener(ls ...netx.Listener) *Listener {
 	res := &Listener{
-		listenMerger: newListenMerger(),
+		mergeListener: newMergeListener(),
 		set:      newSet(),
 	}
 

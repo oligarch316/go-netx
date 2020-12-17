@@ -16,16 +16,24 @@ func (aa AbstractAddr) String() string { return string(aa) }
 // AddrSorter TODO.
 type AddrSorter []AddrComparer
 
+// Less TODO.
+func (as AddrSorter) Less(x, y net.Addr) bool {
+    for _, cmp := range as {
+        if less, equal := cmp(x, y); !equal {
+            return less
+        }
+    }
+    return false
+}
+
 // Sort TODO.
 func (as AddrSorter) Sort(addrs []net.Addr) {
-    sort.SliceStable(addrs, func(i, j int) bool {
-        for _, cmp := range as {
-            if less, equal := cmp(addrs[i], addrs[j]); !equal {
-                return less
-            }
-        }
-        return false
-    })
+    sort.Slice(addrs, func(i, j int) bool { return as.Less(addrs[i], addrs[j]) })
+}
+
+// Stable TODO.
+func (as AddrSorter) Stable(addrs []net.Addr) {
+    sort.SliceStable(addrs, func(i, j int) bool { return as.Less(addrs[i], addrs[j]) })
 }
 
 // AddrComparer TODO.

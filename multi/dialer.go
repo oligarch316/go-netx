@@ -5,6 +5,7 @@ import (
     "errors"
     "fmt"
     "net"
+    "sort"
     "strconv"
     "sync/atomic"
 
@@ -29,6 +30,19 @@ type Dialer interface {
 type Addr struct {
     net.Addr
     Hash
+}
+
+// AddrSorter TODO.
+type AddrSorter []netx.AddrComparer
+
+// Sort TODO.
+func (as AddrSorter) Sort(addrs []Addr) {
+    sort.Slice(addrs, func(i, j int) bool { return netx.AddrSorter(as).Less(addrs[i], addrs[j]) })
+}
+
+// Stable TODO.
+func (as AddrSorter) Stable(addrs []Addr) {
+    sort.SliceStable(addrs, func(i, j int) bool { return netx.AddrSorter(as).Less(addrs[i], addrs[j]) })
 }
 
 // Hash TODO.
