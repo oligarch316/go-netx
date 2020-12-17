@@ -6,51 +6,57 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/oligarch316/go-netx/serverx"
 	"google.golang.org/grpc"
 )
 
-type serviceID struct{}
+var errServiceMultipleServe = errors.New("already running")
 
-func (serviceID) String() string { return "grpc" }
+type (
+	// Handler TODO.
+	Handler interface{ Register(*grpc.Server) }
 
-var (
-	// ID TODO.
-	ID serverx.ServiceID = serviceID{}
-
-	errMultipleServe = errors.New("serve function called multiple times")
+	// HandlerFunc TODO.
+	HandlerFunc func(*grpc.Server)
 )
+
+// Register TODO.
+func (hf HandlerFunc) Register(s *grpc.Server) { hf(s) }
+
+// ServiceParams TODO.
+type ServiceParams struct {
+	Handlers          []Handler
+	GRPCServerOptions []grpc.ServerOption
+}
 
 // Service TODO.
 type Service struct {
-	Handlers          []Handler
-	GRPCServerOptions []grpc.ServerOption
+	identity
 
+	params    ServiceParams
 	svr       *grpc.Server
 	serveFlag uint32
 }
 
 // NewService TODO.
-func NewService(opts ...Option) *Service {
+func NewService(opts ...ServiceOption) *Service {
 	res := new(Service)
 	for _, opt := range opts {
-		opt(res)
+		opt(&res.params)
 	}
 	return res
 }
 
-// ID TODO.
-func (Service) ID() serverx.ServiceID { return ID }
-
 // Serve TODO.
 func (s *Service) Serve(l net.Listener) error {
 	if !atomic.CompareAndSwapUint32(&s.serveFlag, 0, 1) {
-		return errMultipleServe
+		return Error{ Component: "service", err: errServiceMultipleServe }
 	}
 
-	s.svr = grpc.NewServer(s.GRPCServerOptions...)
+	defer func() { s.serveFlag = 0 }()
 
-	for _, h := range s.Handlers {
+	s.svr = grpc.NewServer(s.params.GRPCServerOptions...)
+
+	for _, h := range s.params.Handlers {
 		h.Register(s.svr)
 	}
 
