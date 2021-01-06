@@ -7,7 +7,7 @@ const DefaultKey = "localapp"
 
 // DefaultNetworkPriority TODO.
 var DefaultNetworkPriority = []string{
-	netx.NetworkInternal,
+	netx.InternalNetwork,
 	"unix",
 	"tcp",
 }
