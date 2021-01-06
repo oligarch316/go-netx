@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/oligarch316/go-netx/multi"
 	"github.com/oligarch316/go-netx/runner"
 )
 
-// ErrNoSuchServiceID TODO.
-var ErrNoSuchServiceID = errors.New("no such service id")
+var errNoSuchServiceID = errors.New("serverx: no such service id")
 
 // Server TODO.
 type Server struct {
@@ -41,12 +39,12 @@ func (s *Server) Close(ctx context.Context) {
 	}
 }
 
-// Dialer TODO.
-func (s *Server) Dialer(id ServiceID) (multi.Dialer, error) {
+// DialSet TODO.
+func (s *Server) DialSet(id ServiceID) (*DialSet, error) {
 	if ml, ok := s.svcParams.mlOk(id); ok {
-		return ml, nil
+		return &DialSet{ml.Set}, nil
 	}
-	return nil, fmt.Errorf("%w: %s", ErrNoSuchServiceID, id)
+	return nil, fmt.Errorf("%w: %s", errNoSuchServiceID, id)
 }
 
 // Serve TODO.

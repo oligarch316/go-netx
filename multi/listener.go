@@ -11,17 +11,18 @@ import (
 	"github.com/oligarch316/go-netx/runner"
 )
 
-const (
-	// NetworkName TODO.
-	NetworkName = "multi"
-
-	addrMergeListener netx.AbstractAddr = NetworkName
-)
+// NetworkName TODO.
+const NetworkName = "multi"
 
 var (
-	errMergeListenerClosed = errors.New("listener closed")
-	errMergeRunnerClosed = errors.New("runner closed")
+	errMergeListenerClosed = errors.New("multi: listener closed")
+	errMergeRunnerClosed   = errors.New("multi: runner closed")
 )
+
+type mergeAddr struct{}
+
+func (mergeAddr) Network() string { return NetworkName }
+func (mergeAddr) String() string  { return NetworkName }
 
 type mergeListener struct {
 	connChan  chan net.Conn
@@ -36,15 +37,7 @@ func newMergeListener() mergeListener {
 	}
 }
 
-func (ml *mergeListener) runner(l net.Listener) runner.Item {
-	return &mergeRunner{
-		l:  l,
-		mergeL: ml,
-
-		doneChan:  make(chan struct{}),
-		closeChan: make(chan struct{}),
-	}
-}
+func (*mergeListener) Addr() net.Addr { return mergeAddr{} }
 
 func (ml *mergeListener) Accept() (net.Conn, error) {
 	select {
@@ -55,15 +48,23 @@ func (ml *mergeListener) Accept() (net.Conn, error) {
 	}
 }
 
-func (*mergeListener) Addr() net.Addr { return addrMergeListener }
-
 func (ml *mergeListener) Close() error {
 	ml.closeOnce.Do(func() { close(ml.closeChan) })
 	return nil
 }
 
+func (ml *mergeListener) runner(l net.Listener) runner.Item {
+	return &mergeRunner{
+		l:      l,
+		mergeL: ml,
+
+		doneChan:  make(chan struct{}),
+		closeChan: make(chan struct{}),
+	}
+}
+
 type mergeRunner struct {
-	l  net.Listener
+	l      net.Listener
 	mergeL *mergeListener
 
 	doneChan  chan struct{}
@@ -142,14 +143,14 @@ func (mr *mergeRunner) Close(ctx context.Context) error {
 // Listener TODO.
 type Listener struct {
 	mergeListener
-	set
+	Set
 }
 
 // NewListener TODO.
 func NewListener(ls ...netx.Listener) *Listener {
 	res := &Listener{
 		mergeListener: newMergeListener(),
-		set:      newSet(),
+		Set:           newSet(),
 	}
 
 	res.Append(ls...)

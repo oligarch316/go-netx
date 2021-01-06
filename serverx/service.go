@@ -92,5 +92,5 @@ func (s *service) signalDone() error {
 		return nil
 	}
 
-	return fmt.Errorf("signalDone() called on uninitialized service (%s)", s.svc.ID())
+	return fmt.Errorf("serverx: signalDone() called on uninitialized service (%s)", s.svc.ID())
 }
