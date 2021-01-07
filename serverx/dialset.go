@@ -14,6 +14,9 @@ var errUnknownDialFailure = errors.New("serverx: unknown dial failure")
 // DialSet TODO.
 type DialSet struct{ mSet multi.Set }
 
+// Len TODO.
+func (ds DialSet) Len() int { return ds.mSet.Len() }
+
 // Dial TODO.
 func (ds DialSet) Dial(hs ...multi.Hash) (net.Conn, error) {
 	var firstErr error

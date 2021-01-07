@@ -17,10 +17,9 @@ func WithHandlers(hs ...Handler) ServiceOption {
 
 // WithHandlerFuncs TODO.
 func WithHandlerFuncs(fs ...func(*grpc.Server)) ServiceOption {
-	var hs []Handler
-	for _, f := range fs {
-		hs = append(hs, HandlerFunc(f))
+	hs := make([]Handler, len(fs))
+	for i, f := range fs {
+		hs[i] = HandlerFunc(f)
 	}
-
 	return WithHandlers(hs...)
 }

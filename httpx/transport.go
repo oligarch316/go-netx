@@ -21,14 +21,6 @@ type TransportParams struct {
 	HTTPTransportOptions                []func(*http.Transport)
 }
 
-func (tp TransportParams) build() *http.Transport {
-	res := http.DefaultTransport.(*http.Transport).Clone()
-	for _, opt := range tp.HTTPTransportOptions {
-		opt(res)
-	}
-	return res
-}
-
 func defaultTransportParams() TransportParams {
 	var (
 		key = servicex.DefaultKey
@@ -41,6 +33,14 @@ func defaultTransportParams() TransportParams {
 		SchemeName:    &key,
 		AddressOrder:  addrsort.CompareList{cmp},
 	}
+}
+
+func (tp TransportParams) build() *http.Transport {
+	res := http.DefaultTransport.(*http.Transport).Clone()
+	for _, opt := range tp.HTTPTransportOptions {
+		opt(res)
+	}
+	return res
 }
 
 // Transport TODO.

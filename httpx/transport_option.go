@@ -38,7 +38,7 @@ func WithResolveHostName(name string) TransportOption {
 	return func(p *TransportParams) { p.HostName = &name }
 }
 
-// WithResolveAddrOrder TODO.
-func WithResolveAddrOrder(cmps ...addrsort.Comparer) TransportOption {
+// WithResolveAddressOrder TODO.
+func WithResolveAddressOrder(cmps ...addrsort.Comparer) TransportOption {
 	return func(p *TransportParams) { p.AddressOrder = cmps }
 }

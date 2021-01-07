@@ -2,21 +2,44 @@ package grpcx
 
 import (
 	"context"
+	"fmt"
 	"net"
 
-	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/multi"
+	"github.com/oligarch316/go-netx/internal/servicex"
+	"github.com/oligarch316/go-netx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
 	"google.golang.org/grpc"
 )
 
-func buildContextDialerOption(md multi.Dialer) grpc.DialOption {
-	return grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+// DialerParams TODO.
+type DialerParams struct {
+	Resolver        ResolverParams
+	GRPCDialOptions []grpc.DialOption
+}
+
+func defaultDialerParams() DialerParams {
+	var (
+		key = servicex.DefaultKey
+		cmp = addrsort.ByPriorityNetwork(servicex.DefaultNetworkPriority...) // TODO: have servicex export a cmp directly
+	)
+
+	return DialerParams{
+		Resolver: ResolverParams{
+			SchemeName:   &key,
+			DNSHostName:  nil,
+			AddressOrder: addrsort.CompareList{cmp},
+		},
+		GRPCDialOptions: nil,
+	}
+}
+
+func (dp DialerParams) buildContextDialer(dSet *serverx.DialSet) func(context.Context, string) (net.Conn, error) {
+	return func(ctx context.Context, addr string) (net.Conn, error) {
 		if local, h, err := rsvParseHash(addr); local {
 			if err != nil {
-				return nil, Error{ Component: "dialer", err: err }
+				return nil, fmt.Errorf("grpcx: dialer: %w", err)
 			}
-			return md.DialContext(ctx, h)
+			return dSet.DialContext(ctx, h)
 		}
 
 		// TODO: Manage network string better than a hardcoded "tcp"
@@ -34,57 +57,35 @@ func buildContextDialerOption(md multi.Dialer) grpc.DialOption {
 		// Better-but-not-great related fix: https://github.com/grpc/grpc-go/pull/4021/
 
 		return (&net.Dialer{}).DialContext(ctx, "tcp", addr)
-	})
+	}
 }
 
-// DialerParams TODO.
-type DialerParams struct {
-	Resolver        ResolverParams
-	GRPCDialOptions []grpc.DialOption
-}
-
-func defaultDialerParams() DialerParams {
-	var (
-		defaultSchemeName = "localapp"
-		defaultNetworkPriority = []string{ netx.NetworkInternal, "unix", "tcp" }
-	)
-
-	return DialerParams{
-		Resolver: ResolverParams{
-			SchemeName: &defaultSchemeName,
-			DNSHostName: nil,
-			NetworkPriority: defaultNetworkPriority,
-		},
-		GRPCDialOptions: nil,
+func (dp DialerParams) build(dSet *serverx.DialSet) []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithResolvers(dp.Resolver.build(dSet)...),
+		grpc.WithContextDialer(dp.buildContextDialer(dSet)),
 	}
 }
 
 // Dialer TODO.
-type Dialer struct {
-	identity
+type Dialer struct{ commonOpts []grpc.DialOption }
 
-	commonOpts []grpc.DialOption
-}
-
-// NewDialer TODO.
-func NewDialer(s serverx.Server, opts ...DialerOption) (*Dialer, error) {
-	md, err := s.Dialer(ID)
+// LoadDialer TODO.
+func LoadDialer(svr serverx.Server, opts ...DialerOption) (*Dialer, error) {
+	set, err := svr.DialSet(ID)
 	if err != nil {
 		return nil, err
 	}
+	return NewDialer(set, opts...), nil
+}
 
+// NewDialer TODO.
+func NewDialer(set *serverx.DialSet, opts ...DialerOption) *Dialer {
 	params := defaultDialerParams()
 	for _, opt := range opts {
 		opt(&params)
 	}
-
-	commonOpts := append(
-		params.GRPCDialOptions,
-		buildResolversOption(md, params.Resolver),
-		buildContextDialerOption(md),
-	)
-
-	return &Dialer{commonOpts: commonOpts}, nil
+	return &Dialer{commonOpts: params.build(set)}
 }
 
 // Dial TODO.
