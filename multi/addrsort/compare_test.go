@@ -19,7 +19,7 @@ func addr(network, address string) multi.Addr {
 	return multi.Addr{Addr: testAddr{network: network, address: address}}
 }
 
-func TestCompare(t *testing.T) {
+func TestAddrCompare(t *testing.T) {
 	type (
 		input       struct{ x, y multi.Addr }
 		expectation func(*testing.T, bool, bool, string) bool

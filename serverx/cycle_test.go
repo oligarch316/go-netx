@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNormalizeCycle(t *testing.T) {
+func TestCycleNormalize(t *testing.T) {
 	subtests := []struct {
 		name     string
 		cycles   []Cycle
@@ -51,7 +51,7 @@ func TestNormalizeCycle(t *testing.T) {
 	}
 }
 
-func TestNormalizeCycleList(t *testing.T) {
+func TestCycleListNormalize(t *testing.T) {
 	subtests := []struct {
 		name     string
 		list     CycleList
@@ -99,7 +99,7 @@ func TestNormalizeCycleList(t *testing.T) {
 	}
 }
 
-func TestFindDependencyCycles(t *testing.T) {
+func TestCyclesFindDependencies(t *testing.T) {
 	type depMap map[ServiceID][]ServiceID
 
 	subtests := []struct {
