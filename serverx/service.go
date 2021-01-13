@@ -38,8 +38,8 @@ func (s *service) DependOn(svc *service) {
 
 func (s *service) Runners() []runner.Item {
 	var (
-		servicesSem  = runner.NewSemaphore(len(s.dependants))
-		listenersSem = runner.NewSemaphore(s.ml.Len())
+		servicesWG  = runner.NewWaitGroup(len(s.dependants))
+		listenersWG = runner.NewWaitGroup(s.ml.Len())
 
 		serviceRunner = runner.New(
 			// Run() error
@@ -55,25 +55,25 @@ func (s *service) Runners() []runner.Item {
 
 			// Close(context.Context) error
 			func(ctx context.Context) error {
-				listenersSem.Wait()
+				listenersWG.Wait()
 				return s.svc.Close(ctx)
 			},
 		)
 
-		res = []runner.Item{servicesSem, listenersSem, serviceRunner}
+		res = []runner.Item{servicesWG, listenersWG, serviceRunner}
 	)
 
 	for _, item := range s.ml.Runners() {
 		listenRunner := runner.New(
 			// Run() error
 			func() error {
-				defer listenersSem.Done()
+				defer listenersWG.Done()
 				return item.Run()
 			},
 
 			// Close(context.Context) error
 			func(ctx context.Context) error {
-				servicesSem.Wait()
+				servicesWG.Wait()
 				return item.Close(ctx)
 			},
 		)
@@ -81,7 +81,7 @@ func (s *service) Runners() []runner.Item {
 		res = append(res, listenRunner)
 	}
 
-	s.signal = servicesSem.Done
+	s.signal = servicesWG.Done
 
 	return res
 }
