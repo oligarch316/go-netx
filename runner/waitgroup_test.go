@@ -9,6 +9,8 @@ import (
 	rtest "github.com/oligarch316/go-netx/runner/runnertest"
 )
 
+const waitGroupSize = 10
+
 type testWG struct {
 	wg *runner.WaitGroup
 	rtest.Item
@@ -22,18 +24,15 @@ func newWaitGroup(size int) *testWG {
 func (twg *testWG) Done() rtest.Signal { return rtest.GoSignal("done", twg.wg.Done) }
 func (twg *testWG) Wait() rtest.Signal { return rtest.GoSignal("wait", twg.wg.Wait) }
 
-func TestWaitGroupBasic(t *testing.T) {
+func TestConcurrentWaitGroupBasic(t *testing.T) {
 	// High level
 	// - Run() and Wait() MUST block while # Done() calls < size
 	// - Run() and Wait() MUST NOT block once # Done() calls == size
 
-	var (
-		size = 16
-		wg   = newWaitGroup(size)
-	)
+	wg := newWaitGroup(waitGroupSize)
 
 	// Start a run routine
-	t.Logf("beginning Run() of wait group size %d\n", size)
+	t.Logf("beginning Run() on wait group of size %d\n", waitGroupSize)
 	runSig := wg.Run()
 
 	// Start a wait routine
@@ -41,8 +40,8 @@ func TestWaitGroupBasic(t *testing.T) {
 	waitSig := wg.Wait()
 
 	// Call done size-1 times (and check none hang)
-	t.Logf("calling Done() %d times\n", size-1)
-	for i := 0; i < size-1; i++ {
+	t.Logf("calling Done() %d times\n", waitGroupSize-1)
+	for i := 0; i < waitGroupSize-1; i++ {
 		wg.Done().Require(t, rtest.Complete)
 	}
 
@@ -62,7 +61,7 @@ func TestWaitGroupBasic(t *testing.T) {
 	runSig.AssertError(t, nil)
 }
 
-func TestWaitGroupClose(t *testing.T) {
+func TestConcurrentWaitGroupClose(t *testing.T) {
 	// High level
 	// - Run() and Wait() MUST block while Close() HAS NOT been called
 	// - Close(), Run() and Wait() MUST block while Close() context HAS NOT "expired"
@@ -70,13 +69,12 @@ func TestWaitGroupClose(t *testing.T) {
 	// - Done() MUST NOT block once Run() HAS completed
 
 	var (
-		size        = 16
-		wg          = newWaitGroup(size)
-		expectedErr = fmt.Sprintf("wait group closed with 1 out of %d items pending", size)
+		wg          = newWaitGroup(waitGroupSize)
+		expectedErr = fmt.Sprintf("wait group closed with 1 out of %d items pending", waitGroupSize)
 	)
 
 	// Start a run routine (and check for expected error)
-	t.Logf("beginning Run() of wait group size %d\n", size)
+	t.Logf("beginning Run() on wait group of size %d\n", waitGroupSize)
 	runSig := wg.Run()
 
 	// Start a wait routine
@@ -84,8 +82,8 @@ func TestWaitGroupClose(t *testing.T) {
 	waitSig := wg.Wait()
 
 	// Call done size-1 times (and check none hang)
-	t.Logf("calling Done() %d times\n", size-1)
-	for i := 0; i < size-1; i++ {
+	t.Logf("calling Done() %d times\n", waitGroupSize-1)
+	for i := 0; i < waitGroupSize-1; i++ {
 		wg.Done().Require(t, rtest.Complete)
 	}
 
@@ -94,7 +92,7 @@ func TestWaitGroupClose(t *testing.T) {
 	waitSig.Require(t, rtest.Pending)
 
 	// Call close
-	t.Log("calling Close()")
+	t.Log("calling Close(...)")
 	ctx, cancel := context.WithCancel(context.Background())
 	closeSig := wg.Close(ctx)
 
@@ -104,7 +102,7 @@ func TestWaitGroupClose(t *testing.T) {
 	waitSig.Require(t, rtest.Pending)
 
 	// Cancel the context
-	t.Log("canceling context")
+	t.Log("canceling close context")
 	cancel()
 
 	// Check that close, run and wait are all complete
@@ -121,16 +119,15 @@ func TestWaitGroupClose(t *testing.T) {
 	wg.Done().Require(t, rtest.Complete)
 }
 
-func TestWaitGroupDone(t *testing.T) {
+func TestConcurrentWaitGroupDone(t *testing.T) {
 	// High level
 	// - Done() SHOULD block while Run() HAS NOT been called
 	// - Run() and Wait() MUST NOT block once # Done() calls == size, even if
 	//   all Done() calls are made before Run() was called
 
 	var (
-		size        = 16
-		wg          = newWaitGroup(size)
-		doneSignals = make([]rtest.Signal, size)
+		wg          = newWaitGroup(waitGroupSize)
+		doneSignals = make([]rtest.Signal, waitGroupSize)
 	)
 
 	requireDoneSignals := func(state rtest.State) {
@@ -150,8 +147,8 @@ func TestWaitGroupDone(t *testing.T) {
 	waitSig := wg.Wait()
 
 	// Call done size times
-	t.Logf("calling Done() %d times\n", size)
-	for i := 0; i < size; i++ {
+	t.Logf("calling Done() %d times\n", waitGroupSize)
+	for i := 0; i < waitGroupSize; i++ {
 		doneSignals[i] = wg.Done()
 	}
 
@@ -160,7 +157,7 @@ func TestWaitGroupDone(t *testing.T) {
 	waitSig.Require(t, rtest.Pending)
 
 	// Start a run routine
-	t.Logf("beginning Run() of wait group size %d\n", size)
+	t.Logf("beginning Run() on wait group of size %d\n", waitGroupSize)
 	runSig := wg.Run()
 
 	// Check that done, run and wait calls are complete

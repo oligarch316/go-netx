@@ -52,7 +52,7 @@ func (s Signal) comparison(state State) func() bool {
 // Assert TODO.
 func (s Signal) Assert(t assert.TestingT, state State, msgAndArgs ...interface{}) bool {
 	if len(msgAndArgs) < 1 {
-		msgAndArgs = []interface{}{"%s %v", s, state}
+		msgAndArgs = []interface{}{"expected %s to be %v", s, state}
 	}
 	return assert.Condition(t, s.comparison(state), msgAndArgs...)
 }

@@ -30,8 +30,8 @@ func (g *Group) Run() {
 		wg   sync.WaitGroup
 	)
 
-	// size * 2 | once each for run error and (possible) close error
-	g.resultQ = make(chan error, size*2)
+	// size | one (or less) of [run OR close] error per item
+	g.resultQ = make(chan error, size)
 
 	// size | one close signal per item
 	g.closeQ = make(chan chan context.Context, size)
@@ -51,11 +51,35 @@ func (g *Group) Run() {
 		wg.Add(1)
 		go func(i Item) {
 			select {
-			case res := <-doneChan:
-				g.resultQ <- res
+			case err := <-doneChan:
+				// Expectations:
+				// - item.Run() SHOULD block forever until a call to item.Close()
+				// - a well behaved item.Run() SHOULD always return a non-nil
+				//   error if item.Close() has yet to be called
+
+				// Thus:
+				// Send pre-close Run() results regardless of nil/non-nil value.
+				// There must always be a consumable indication that Run() has
+				// completed before Close().
+				g.resultQ <- err
 			case ctx := <-closeChan:
-				g.resultQ <- i.Close(ctx)
-				g.resultQ <- (<-doneChan)
+				// Expectation:
+				// item.Close() SHOULD return a non-nil error if and only if
+				// item.Run() cannot be relied upon to unblock.
+
+				if err := i.Close(ctx); err != nil {
+					// Thus if Close() error != nil:
+					// Send the (non-nil) Close() error and abandon the Run()
+					// routine as an orphan.
+					g.resultQ <- err
+					break
+				}
+
+				// Thus if Close() error == nil
+				// Re-wait for Run() result and send it only if it's non-nil
+				if err := <-doneChan; err != nil {
+					g.resultQ <- err
+				}
 			}
 
 			wg.Done()
