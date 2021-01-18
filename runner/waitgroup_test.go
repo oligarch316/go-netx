@@ -11,25 +11,25 @@ import (
 
 const waitGroupSize = 10
 
-type testWG struct {
+type testWaitGroup struct {
 	wg *runner.WaitGroup
 	rtest.Item
 }
 
-func newWaitGroup(size int) *testWG {
+func setupWaitGroup(size int) *testWaitGroup {
 	wg := runner.NewWaitGroup(size)
-	return &testWG{wg: wg, Item: rtest.WrapItem(wg)}
+	return &testWaitGroup{wg: wg, Item: rtest.WrapItem(wg)}
 }
 
-func (twg *testWG) Done() rtest.Signal { return rtest.GoSignal("done", twg.wg.Done) }
-func (twg *testWG) Wait() rtest.Signal { return rtest.GoSignal("wait", twg.wg.Wait) }
+func (twg *testWaitGroup) Done() rtest.Signal { return rtest.GoSignal("done", twg.wg.Done) }
+func (twg *testWaitGroup) Wait() rtest.Signal { return rtest.GoSignal("wait", twg.wg.Wait) }
 
 func TestConcurrentWaitGroupBasic(t *testing.T) {
 	// High level
 	// - Run() and Wait() MUST block while # Done() calls < size
 	// - Run() and Wait() MUST NOT block once # Done() calls == size
 
-	wg := newWaitGroup(waitGroupSize)
+	wg := setupWaitGroup(waitGroupSize)
 
 	// Start a run routine
 	t.Logf("beginning Run() on wait group of size %d\n", waitGroupSize)
@@ -69,7 +69,7 @@ func TestConcurrentWaitGroupClose(t *testing.T) {
 	// - Done() MUST NOT block once Run() HAS completed
 
 	var (
-		wg          = newWaitGroup(waitGroupSize)
+		wg          = setupWaitGroup(waitGroupSize)
 		expectedErr = fmt.Sprintf("wait group closed with 1 out of %d items pending", waitGroupSize)
 	)
 
@@ -126,7 +126,7 @@ func TestConcurrentWaitGroupDone(t *testing.T) {
 	//   all Done() calls are made before Run() was called
 
 	var (
-		wg          = newWaitGroup(waitGroupSize)
+		wg          = setupWaitGroup(waitGroupSize)
 		doneSignals = make([]rtest.Signal, waitGroupSize)
 	)
 

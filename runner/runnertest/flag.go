@@ -12,6 +12,21 @@ var boolToAssertion = map[bool]assert.BoolAssertionFunc{
 	false: assert.False,
 }
 
+// Bool TODO.
+type Bool bool
+
+// Assert TODO.
+func (b Bool) Assert(t assert.TestingT, value bool, msgAndArgs ...interface{}) bool {
+	return boolToAssertion[bool(b)](t, value, msgAndArgs...)
+}
+
+// Require TODO.
+func (b Bool) Require(t require.TestingT, value bool, msgAndArgs ...interface{}) {
+	if !b.Assert(t, value, msgAndArgs...) {
+		t.FailNow()
+	}
+}
+
 // Flag TODO.
 type Flag struct {
 	name   string
@@ -34,7 +49,7 @@ func (f *Flag) Assert(t assert.TestingT, expected bool, msgAndArgs ...interface{
 	if len(msgAndArgs) < 1 {
 		msgAndArgs = []interface{}{f.String()}
 	}
-	return boolToAssertion[expected](t, f.IsMarked(), msgAndArgs...)
+	return Bool(expected).Assert(t, f.IsMarked(), msgAndArgs...)
 }
 
 // Require TODO.

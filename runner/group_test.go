@@ -20,126 +20,65 @@ func requireGroupSize(t *testing.T, minSize int) {
 	}
 }
 
-type testGroupItem struct {
-	name                          string
-	killChan, closeChan, doneChan chan struct{}
-
-	DidRun, DidClose *rtest.Flag
-	ForceCloseError  bool
+type groupResultSignal struct {
+	*rtest.ErrorSignal
+	Closed bool
 }
 
-func newGroupItem(name string) *testGroupItem {
-	return &testGroupItem{
-		name:      name,
-		killChan:  make(chan struct{}),
-		closeChan: make(chan struct{}),
-		doneChan:  make(chan struct{}),
-
-		DidRun:   rtest.NewFlag(name + " did run"),
-		DidClose: rtest.NewFlag(name + " did close"),
-	}
-}
-
-func (tgi *testGroupItem) Kill() {
-	close(tgi.killChan)
-	<-tgi.doneChan
-}
-
-func (tgi *testGroupItem) Run() error {
-	tgi.DidRun.Mark()
-	defer close(tgi.doneChan)
-
-	select {
-	case <-tgi.killChan:
-		return fmt.Errorf("%s forced run error", tgi)
-	case <-tgi.closeChan:
-		return nil
-	}
-}
-
-func (tgi *testGroupItem) Close(ctx context.Context) error {
-	tgi.DidClose.Mark()
-
-	if tgi.ForceCloseError {
-		return fmt.Errorf("%s forced close error", tgi)
-	}
-
-	defer close(tgi.closeChan)
-
-	select {
-	case <-tgi.doneChan:
-	case <-ctx.Done():
-	}
-
-	return nil
-}
-
-func (tgi testGroupItem) String() string { return tgi.name }
-
-type testGroupItemList []*testGroupItem
-
-func (tgil testGroupItemList) Kill() {
-	for _, item := range tgil {
-		item.Kill()
-	}
-}
-
-func (tgil testGroupItemList) AssertDidRun(t assert.TestingT, expected bool) bool {
-	res := true
-	for _, item := range tgil {
-		res = item.DidRun.Assert(t, expected) && res
-	}
+func goGroupResultSignal(group *runner.Group) *groupResultSignal {
+	res := new(groupResultSignal)
+	res.ErrorSignal = rtest.GoErrorSignal("result", func() error {
+		err, more := <-group.Results()
+		res.Closed = !more
+		return err
+	})
 	return res
 }
 
-func (tgil testGroupItemList) AssertDidClose(t assert.TestingT, expected bool) bool {
-	res := true
-	for _, item := range tgil {
-		res = item.DidClose.Assert(t, expected) && res
-	}
-	return res
+func (grs *groupResultSignal) RequireClosed(t require.TestingT, expected bool) {
+	rtest.Bool(expected).Require(t, grs.Closed, "%s channel closed", grs)
 }
 
-type testGroupResults struct {
+type groupResultListSignal struct {
 	rtest.Signal
-	Errs []error
+	Errors []error
 }
 
-func goGroupResults(group *runner.Group) *testGroupResults {
-	res := new(testGroupResults)
-	res.Signal = rtest.GoSignal("results", func() {
+func goGroupResultListSignal(group *runner.Group) *groupResultListSignal {
+	res := new(groupResultListSignal)
+	res.Signal = rtest.GoSignal("all results", func() {
 		for err := range group.Results() {
-			res.Errs = append(res.Errs, err)
+			res.Errors = append(res.Errors, err)
 		}
 	})
 	return res
 }
 
-func (tgr testGroupResults) AssertErrors(t assert.TestingT, expected ...string) bool {
+func (grls *groupResultListSignal) AssertErrors(t assert.TestingT, expected ...string) bool {
 	if len(expected) == 0 {
-		return assert.Empty(t, tgr.Errs, "group results")
+		return assert.Empty(t, grls.Errors, grls.String())
 	}
 
-	actual := make([]string, len(tgr.Errs))
-	for i, err := range tgr.Errs {
+	actual := make([]string, len(grls.Errors))
+	for i, err := range grls.Errors {
 		if err == nil {
-			actual[i] = "<nil>"
+			actual[i] = "nil"
 		} else {
 			actual[i] = err.Error()
 		}
 	}
 
-	return assert.ElementsMatch(t, expected, actual, "group results")
+	return assert.ElementsMatch(t, expected, actual, grls.String())
 }
 
-func setupGroup(size int) (*runner.Group, testGroupItemList) {
+func setupGroup(size int) (*runner.Group, mockItemList) {
 	var (
 		group = runner.NewGroup()
-		items = make(testGroupItemList, size)
+		items = make(mockItemList, size)
 	)
 
 	for i := 0; i < size; i++ {
-		items[i] = newGroupItem(fmt.Sprintf("test item %d", i))
+		items[i] = newMockItem(fmt.Sprintf("mock item %d", i))
 		group.Append(items[i])
 	}
 
@@ -163,7 +102,7 @@ func TestConcurrentGroupSuccess(t *testing.T) {
 	group.Run()
 
 	t.Log("beginning consumption of Results()")
-	results := goGroupResults(group)
+	results := goGroupResultListSignal(group)
 
 	results.Require(t, rtest.Pending)
 
@@ -198,14 +137,14 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		)
 
 		for i := 0; i < groupSize; i++ {
-			expectedErrs[i] = fmt.Sprintf("test item %d forced run error", i)
+			expectedErrs[i] = fmt.Sprintf("mock item %d forced run error", i)
 		}
 
 		t.Logf("calling Run() on group of size %d\n", groupSize)
 		group.Run()
 
 		t.Log("beginning consumption of Results()")
-		results := goGroupResults(group)
+		results := goGroupResultListSignal(group)
 
 		t.Logf("calling Kill() on last %d items\n", groupSize-1)
 		items[1:].Kill()
@@ -230,14 +169,14 @@ func TestConcurrentGroupRunError(t *testing.T) {
 	t.Run("one before close", func(t *testing.T) {
 		var (
 			group, items = setupGroup(groupSize)
-			expectedErr  = "test item 0 forced run error"
+			expectedErr  = "mock item 0 forced run error"
 		)
 
 		t.Logf("calling Run() on group of size %d\n", groupSize)
 		group.Run()
 
 		t.Log("beginning consumption of Results()")
-		results := goGroupResults(group)
+		results := goGroupResultListSignal(group)
 
 		t.Log("calling Kill() on first item")
 		items[0].Kill()
@@ -260,14 +199,14 @@ func TestConcurrentGroupRunError(t *testing.T) {
 	t.Run("one mid-close", func(t *testing.T) {
 		var (
 			group, items = setupGroup(groupSize)
-			expectedErr  = "test item 0 forced run error"
+			expectedErr  = "mock item 0 forced run error"
 		)
 
 		t.Logf("calling Run() on group of size %d\n", groupSize)
 		group.Run()
 
 		t.Log("beginning consumption of Results()")
-		results := goGroupResults(group)
+		results := goGroupResultListSignal(group)
 
 		results.Require(t, rtest.Pending)
 
@@ -296,7 +235,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		var (
 			group, items = setupGroup(groupSize - 1)
 			forcedErr    = "forced run after close error"
-			specialItem  = newGroupItem("test item special")
+			specialItem  = newMockItem("mock item special")
 		)
 
 		items = append(items, specialItem)
@@ -312,7 +251,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		group.Run()
 
 		t.Log("beginning consumption of Results()")
-		results := goGroupResults(group)
+		results := goGroupResultListSignal(group)
 
 		results.Require(t, rtest.Pending)
 
@@ -339,7 +278,7 @@ func TestConcurrentGroupCloseError(t *testing.T) {
 
 	var (
 		group, items = setupGroup(groupSize)
-		expectedErr  = "test item 0 forced close error"
+		expectedErr  = "mock item 0 forced close error"
 	)
 
 	t.Log("setting first item to force a close error")
@@ -349,7 +288,7 @@ func TestConcurrentGroupCloseError(t *testing.T) {
 	group.Run()
 
 	t.Log("beginning consumption of Results()")
-	results := goGroupResults(group)
+	results := goGroupResultListSignal(group)
 
 	results.Require(t, rtest.Pending)
 
@@ -379,8 +318,8 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 		group, items = setupGroup(groupSize)
 		ctx, cancel  = context.WithCancel(context.Background())
 		expectedErrs = []string{
-			"test item 0 forced run error",
-			"test item 1 forced close error",
+			"mock item 0 forced run error",
+			"mock item 1 forced close error",
 		}
 	)
 
@@ -398,7 +337,7 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 	cancel()
 
 	t.Log("beginning consumption of Results()")
-	results := goGroupResults(group)
+	results := goGroupResultListSignal(group)
 
 	results.Require(t, rtest.Complete)
 
@@ -418,10 +357,7 @@ func TestConcurrentGroupTimelyResults(t *testing.T) {
 
 	requireGroupSize(t, 1)
 
-	var (
-		group, items = setupGroup(groupSize)
-		nextResult   = func() error { return <-group.Results() }
-	)
+	group, items := setupGroup(groupSize)
 
 	t.Logf("calling Run() on group of size %d\n", groupSize)
 	group.Run()
@@ -429,25 +365,20 @@ func TestConcurrentGroupTimelyResults(t *testing.T) {
 	t.Log("calling Kill() and reading result for each item")
 	for i, item := range items {
 		var (
-			expectedErr = fmt.Sprintf("test item %d forced run error", i)
-			sig         = rtest.GoErrorSignal("read result", nextResult)
+			expectedErr = fmt.Sprintf("mock item %d forced run error", i)
+			result      = goGroupResultSignal(group)
 		)
 
 		item.Kill()
-		sig.Require(t, rtest.Complete)
-		sig.RequireError(t, expectedErr)
+		result.Require(t, rtest.Complete)
+		result.RequireClosed(t, false)
+		result.AssertError(t, expectedErr)
 	}
 
-	var (
-		finalErr    error
-		finalMore   bool
-		finalResult = func() { finalErr, finalMore = <-group.Results() }
-	)
-
 	t.Log("reading once more from results")
-	sig := rtest.GoSignal("read final result", finalResult)
+	result := goGroupResultSignal(group)
 
-	sig.Require(t, rtest.Complete)
-	assert.NoError(t, finalErr, "final error result")
-	assert.False(t, finalMore, "final more result")
+	result.Require(t, rtest.Complete)
+	result.AssertError(t, nil)
+	result.RequireClosed(t, true)
 }
