@@ -123,21 +123,19 @@ func (mr *mergeRunner) Run() error {
 }
 
 func (mr *mergeRunner) Close(ctx context.Context) error {
-	err := mr.l.Close()
+	if err := mr.l.Close(); err != nil {
+		// TODO: Log/track/surface this somehow
+		close(mr.closeChan)
+		return nil
+	}
 
 	select {
 	case <-mr.doneChan:
 	case <-ctx.Done():
 		// TODO: Log/track/surface this somehow
 		close(mr.closeChan)
-
-		// TODO: Is this wait on the doneChan not overkill?
-		// Aren't Close functions of Runners expected to be fire and forget...
-		// (specifically the runner.Group is doing this close and re-wait logic for us already)
-		<-mr.doneChan
 	}
-
-	return err
+	return nil
 }
 
 // Listener TODO.

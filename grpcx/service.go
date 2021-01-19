@@ -69,7 +69,6 @@ func (s *Service) Close(ctx context.Context) error {
 	atomic.StoreUint32(&s.closeFlag, 1)
 
 	doneChan := make(chan struct{})
-
 	go func() {
 		s.svr.GracefulStop()
 		close(doneChan)
@@ -77,9 +76,11 @@ func (s *Service) Close(ctx context.Context) error {
 
 	select {
 	case <-doneChan:
-		return nil
 	case <-ctx.Done():
 		s.svr.Stop()
-		return ctx.Err()
+
+		// TODO: Log/track/surface ctx.Err() somehow
 	}
+
+	return nil
 }
