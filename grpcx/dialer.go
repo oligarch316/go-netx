@@ -61,10 +61,11 @@ func (dp DialerParams) buildContextDialer(dSet *serverx.DialSet) func(context.Co
 }
 
 func (dp DialerParams) build(dSet *serverx.DialSet) []grpc.DialOption {
-	return []grpc.DialOption{
+	return append(
+		dp.GRPCDialOptions,
 		grpc.WithResolvers(dp.Resolver.build(dSet)...),
 		grpc.WithContextDialer(dp.buildContextDialer(dSet)),
-	}
+	)
 }
 
 // Dialer TODO.
