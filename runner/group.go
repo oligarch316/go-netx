@@ -5,6 +5,10 @@ import (
 	"sync"
 )
 
+// TODO:
+// Already I ran into the call Results() before calling Run() silent issue, and I wrote this.
+// The result channel needs to be a return value from Run(), really obvious.
+
 // Group TODO.
 type Group struct {
 	items []Item

@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	rtest "github.com/oligarch316/go-netx/runner/runnertest"
-	"github.com/stretchr/testify/assert"
+	"github.com/oligarch316/go-netx/synctest"
 )
 
 type mockItem struct {
 	name                          string
 	killChan, closeChan, doneChan chan struct{}
 
-	DidRun, DidClose *rtest.Flag
-	ForceCloseError  bool
+	RunFlag, CloseFlag *synctest.Marker
+	ForceCloseError    bool
 }
 
 func newMockItem(name string) *mockItem {
@@ -23,8 +22,8 @@ func newMockItem(name string) *mockItem {
 		closeChan: make(chan struct{}),
 		doneChan:  make(chan struct{}),
 
-		DidRun:   rtest.NewFlag(name + " did run"),
-		DidClose: rtest.NewFlag(name + " did close"),
+		RunFlag:   synctest.NewMarker(name + " Run() flag"),
+		CloseFlag: synctest.NewMarker(name + " Close() flag"),
 	}
 }
 
@@ -36,7 +35,7 @@ func (mi *mockItem) Kill() {
 }
 
 func (mi *mockItem) Run() error {
-	mi.DidRun.Mark()
+	mi.RunFlag.Mark()
 	defer close(mi.doneChan)
 
 	select {
@@ -48,7 +47,7 @@ func (mi *mockItem) Run() error {
 }
 
 func (mi *mockItem) Close(ctx context.Context) error {
-	mi.DidClose.Mark()
+	mi.CloseFlag.Mark()
 
 	if mi.ForceCloseError {
 		return fmt.Errorf("%s forced close error", mi)
@@ -72,18 +71,16 @@ func (mil mockItemList) Kill() {
 	}
 }
 
-func (mil mockItemList) AssertDidRun(t assert.TestingT, expected bool) bool {
-	res := true
+func (mil mockItemList) RunFlags() (res synctest.MarkerList) {
 	for _, item := range mil {
-		res = item.DidRun.Assert(t, expected) && res
+		res = append(res, item.RunFlag)
 	}
-	return res
+	return
 }
 
-func (mil mockItemList) AssertDidClose(t assert.TestingT, expected bool) bool {
-	res := true
+func (mil mockItemList) CloseFlags() (res synctest.MarkerList) {
 	for _, item := range mil {
-		res = item.DidClose.Assert(t, expected) && res
+		res = append(res, item.CloseFlag)
 	}
-	return res
+	return
 }
