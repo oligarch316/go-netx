@@ -11,6 +11,8 @@ type result struct {
 
 func (r result) String() string { return string(r.name) }
 
+func (r result) Value() interface{} { return r.value }
+
 func (r result) FailAssertion() func(AssertT, string) bool {
 	return func(t AssertT, message string) bool {
 		t.Helper()
@@ -21,14 +23,14 @@ func (r result) FailAssertion() func(AssertT, string) bool {
 func (r result) CompareAssertion(check assert.ComparisonAssertionFunc) func(AssertT, interface{}) bool {
 	return func(t AssertT, expected interface{}) bool {
 		t.Helper()
-		return check(t, expected, r.value, r.String())
+		return check(t, expected, r.Value(), r.String())
 	}
 }
 
 func (r result) ValueAssertion(check assert.ValueAssertionFunc) func(AssertT) bool {
 	return func(t AssertT) bool {
 		t.Helper()
-		return check(t, r.value, r.String())
+		return check(t, r.Value(), r.String())
 	}
 }
 
@@ -46,9 +48,6 @@ func GoResultSignal(name string, f func() interface{}) ResultSignal {
 		Signal: GoSignal(name, func() { r.value = f() }),
 	}
 }
-
-// Value TODO.
-func (rs ResultSignal) Value() interface{} { return rs.value }
 
 // AssertEqual TODO.
 func (rs ResultSignal) AssertEqual(t AssertT, expected interface{}) bool {

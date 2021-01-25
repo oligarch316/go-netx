@@ -31,6 +31,8 @@ func (mi mockItem) String() string { return mi.name }
 
 func (mi *mockItem) Kill() {
 	close(mi.killChan)
+
+	// Necessary to ensure our kill signal doesn't complete/race with race mi.Close(...) during tests
 	<-mi.doneChan
 }
 

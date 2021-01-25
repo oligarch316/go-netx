@@ -90,8 +90,5 @@ func (s *Server) Serve(svcs ...Service) <-chan error {
 	}
 
 	// Start the run group
-	s.runGroup.Run()
-
-	// Return the run group's error channel
-	return s.runGroup.Results()
+	return s.runGroup.Run()
 }

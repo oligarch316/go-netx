@@ -48,8 +48,7 @@ func TestConcurrentGroupSuccess(t *testing.T) {
 	group, items := setupGroup("group", groupSize)
 
 	// Call Run() and start Results() consumer routine
-	group.Run()
-	results := group.ErrorResults().All()
+	results := group.Run().All()
 
 	// Check results still pending
 	results.RequireState(t, synctest.Pending)
@@ -84,7 +83,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 	t.Run("all before close", func(t *testing.T) {
 		var (
 			group, items = setupGroup("group", groupSize)
-			expectedErrs = make([]interface{}, len(items))
+			expectedErrs = make([]string, len(items))
 		)
 
 		for i, item := range items {
@@ -92,8 +91,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		}
 
 		// Call Run() and start Results() consumer routine
-		group.Run()
-		results := group.StringResults().All()
+		results := group.Run().All()
 
 		// Call Kill() on last size-1 items
 		items[1:].Kill()
@@ -111,7 +109,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		require.NotPanics(t, group.CloseNow)
 
 		// Check ...
-		results.AssertEqual(t, expectedErrs...)              // ... expected error results
+		results.AssertEqualStrings(t, expectedErrs...)       // ... expected error results
 		items.RunFlags().AssertState(t, synctest.Marked)     // ... all items ran
 		items.CloseFlags().AssertState(t, synctest.Unmarked) // ... no items closed
 	})
@@ -122,24 +120,25 @@ func TestConcurrentGroupRunError(t *testing.T) {
 			expectedErr  = "mock item 0 forced run error"
 		)
 
-		// Call Run() and start Results() consumer routine
-		group.Run()
-		results := group.StringResults().All()
+		// Call Run() and start Results() consumer routine for 1 result
+		resultChan := group.Run()
+		firstResult := resultChan.Next(1)
 
-		// Call Kill() on first item
+		// Call Kill() on first item and check first result complete
 		items[0].Kill()
+		firstResult.RequireState(t, synctest.Complete)
 
-		// Check results still pending
-		results.RequireState(t, synctest.Pending)
+		// Start Results() consumer routine for remaining results and check pending
+		remainingResults := resultChan.All()
+		remainingResults.RequireState(t, synctest.Pending)
 
-		// Call Close() (and cancel context)
+		// Call Close() (and cancel context) and check remaining results complete
 		group.CloseNow()
-
-		// Check results complete
-		results.RequireState(t, synctest.Complete)
+		remainingResults.RequireState(t, synctest.Complete)
 
 		// Check ...
-		results.AssertEqual(t, expectedErr)                    // ... expected error result
+		firstResult.AssertEqualStrings(t, expectedErr)         // ... expected error result
+		remainingResults.AssertEqual(t)                        // ... no other errors
 		items.RunFlags().AssertState(t, synctest.Marked)       // ... all items ran
 		items[1:].CloseFlags().AssertState(t, synctest.Marked) // ... last size-1 items closed
 		items[0].CloseFlag.AssertState(t, synctest.Unmarked)   // ... first item did NOT close
@@ -152,8 +151,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		)
 
 		// Call Run() and start Results() consumer routine
-		group.Run()
-		results := group.StringResults().All()
+		results := group.Run().All()
 
 		// Check results still pending
 		results.RequireState(t, synctest.Pending)
@@ -178,7 +176,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		results.RequireState(t, synctest.Complete)
 
 		// Check ...
-		results.AssertEqual(t, expectedErr)                // ... expected error result
+		results.AssertEqualStrings(t, expectedErr)         // ... expected error result
 		items.RunFlags().AssertState(t, synctest.Marked)   // ... all items ran
 		items.CloseFlags().AssertState(t, synctest.Marked) // ... all items closed
 	})
@@ -200,8 +198,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		))
 
 		// Call Run() and start Results() consumer routine
-		group.Run()
-		results := group.ErrorResults().All()
+		results := group.Run().All()
 
 		// Check results still pending
 		results.RequireState(t, synctest.Pending)
@@ -236,8 +233,7 @@ func TestConcurrentGroupCloseError(t *testing.T) {
 	items[0].ForceCloseError = true
 
 	// Call Run() and start Results() consumer routine
-	group.Run()
-	results := group.StringResults().All()
+	results := group.Run().All()
 
 	// Check results still pending
 	results.RequireState(t, synctest.Pending)
@@ -252,7 +248,7 @@ func TestConcurrentGroupCloseError(t *testing.T) {
 	items[0].Kill()
 
 	// Check ...
-	results.AssertEqual(t, expectedErr)                // ... expected error result
+	results.AssertEqualStrings(t, expectedErr)         // ... expected error result
 	items.RunFlags().AssertState(t, synctest.Marked)   // ... all items ran
 	items.CloseFlags().AssertState(t, synctest.Marked) // ... all items closed
 }
@@ -264,18 +260,9 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 
 	requireGroupSize(t, 2)
 
-	// var (
-	// 	group, items = setupGroup(groupSize)
-	// 	ctx, cancel  = context.WithCancel(context.Background())
-	// 	expectedErrs = []string{
-	// 		"mock item 0 forced run error",
-	// 		"mock item 1 forced close error",
-	// 	}
-	// )
-
 	var (
 		group, items = setupGroup("group", groupSize)
-		expectedErrs = []interface{}{
+		expectedErrs = []string{
 			"mock item 0 forced run error",
 			"mock item 1 forced close error",
 		}
@@ -285,7 +272,7 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 	items[1].ForceCloseError = true
 
 	// Call Run()
-	group.Run()
+	resultChan := group.Run()
 
 	// Call Kill() on first item
 	items[0].Kill()
@@ -294,7 +281,7 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 	group.CloseNow()
 
 	// Start Results() consumer routine
-	results := group.StringResults().All()
+	results := resultChan.All()
 
 	// Check results complete
 	results.RequireState(t, synctest.Complete)
@@ -303,10 +290,15 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 	items[1].Kill()
 
 	// Check ...
-	results.AssertEqual(t, expectedErrs...)                // ... expected error results
+	results.AssertEqualStrings(t, expectedErrs...)         // ... expected error results
 	items.RunFlags().AssertState(t, synctest.Marked)       // ... all items ran
 	items[1:].CloseFlags().AssertState(t, synctest.Marked) // ... last size-1 items closed
-	items[0].CloseFlag.AssertState(t, synctest.Unmarked)   // ... first item did NOT close
+
+	// NOTE:
+	// Don't make any assertions about items[0].CloseFlag Marked/Unmarked.
+	// Without reading the result from Kill() before calling group.Close()
+	// whether items[0].Close() is called remains ambiguous.
+	// Specific behavior for this case is tested in RunError/one_before_close.
 }
 
 func TestConcurrentGroupTimelyResults(t *testing.T) {
@@ -314,25 +306,18 @@ func TestConcurrentGroupTimelyResults(t *testing.T) {
 	// - Ensure errors from (and closing of) results channel manifest as they
 	//   occur
 
-	t.Skip("ergonomics fix required, see group.go TODO")
-
 	requireGroupSize(t, 1)
 
-	var (
-		group, items = setupGroup("group", groupSize)
-		resultChan   = group.StringResults()
-	)
+	group, items := setupGroup("group", groupSize)
 
 	// Call Run()
-	group.Run()
+	resultChan := group.Run()
 
 	// For each item one by one ...
 	for _, item := range items {
-		t.Logf("processing %s\n", item)
-
 		expectedErr := fmt.Sprintf("%s forced run error", item)
 
-		// ... start single result consumer routine
+		// ... start Results() consumer routine for 1 result
 		result := resultChan.Next(1)
 
 		// ... check single result still pending
@@ -343,13 +328,13 @@ func TestConcurrentGroupTimelyResults(t *testing.T) {
 
 		// ... check single result complete with expected error
 		result.RequireState(t, synctest.Complete)
-		result.AssertEqual(t, expectedErr)
+		result.AssertEqualStrings(t, expectedErr)
 	}
 
-	// Start remainder result consumer routine
+	// Start Results() consumer routine for remaining results
 	remainder := resultChan.All()
 
-	// Check remainder results complete and empty
+	// Check remaining results complete and empty
 	remainder.RequireState(t, synctest.Complete)
 	remainder.AssertEqual(t)
 }

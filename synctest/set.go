@@ -6,9 +6,17 @@ import (
 
 type setResult struct{ result }
 
-func (sr setResult) setValue() []interface{} {
+func (sr setResult) Value() []interface{} {
 	res, _ := sr.value.([]interface{})
 	return res
+}
+
+// SetAssertion TODO.
+func (sr setResult) SetAssertion(check func(AssertT, []interface{}, ...interface{}) bool) func(AssertT) bool {
+	return func(t AssertT) bool {
+		t.Helper()
+		return check(t, sr.Value(), sr.String())
+	}
 }
 
 // SetSignal TODO.
@@ -26,9 +34,6 @@ func GoSetSignal(name string, f func() []interface{}) SetSignal {
 		Signal:    GoSignal(name, func() { r.value = f() }),
 	}
 }
-
-// Value TODO.
-func (ss SetSignal) Value() []interface{} { return ss.setValue() }
 
 // AssertEqual TODO.
 func (ss SetSignal) AssertEqual(t AssertT, expected ...interface{}) bool {
