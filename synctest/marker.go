@@ -2,81 +2,98 @@ package synctest
 
 import (
 	"sync/atomic"
-
-	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-var (
+const (
 	// Marked TODO.
-	Marked = MarkerState{name: "marked", val: 1}
+	Marked MarkerState = 1
 
 	// Unmarked TODO.
-	Unmarked = MarkerState{name: "unmarked", val: 0}
+	Unmarked MarkerState = 0
 )
 
 // MarkerState TODO.
-type MarkerState struct {
-	name string
-	val  uint32
-}
+type MarkerState uint32
 
-func (ms MarkerState) String() string { return ms.name }
+func (ms MarkerState) String() string {
+	if ms == 0 {
+		return "unmarked"
+	}
+	return "marked"
+}
 
 // Marker TODO.
 type Marker struct {
 	name string
-	val  uint32
+	val  MarkerState
 }
 
 // NewMarker TODO.
-func NewMarker(name string) *Marker { return &Marker{name: name, val: Unmarked.val} }
+func NewMarker(name string) *Marker {
+	return &Marker{
+		name: name,
+		val:  Unmarked,
+	}
+}
 
-func (m Marker) String() string { return m.name }
+func (m *Marker) String() string { return m.name }
 
 // Mark TODO.
-func (m *Marker) Mark() { atomic.StoreUint32(&m.val, Marked.val) }
+func (m *Marker) Mark() { atomic.StoreUint32((*uint32)(&m.val), uint32(Marked)) }
 
-// Is TODO.
-func (m *Marker) Is(state MarkerState) bool { return atomic.LoadUint32(&m.val) == state.val }
+// State TODO.
+func (m *Marker) State() MarkerState {
+	return MarkerState(atomic.LoadUint32((*uint32)(&m.val)))
+}
+
+func (m *Marker) checkState(expected MarkerState) (*report, bool) {
+	if actual := m.State(); expected != actual {
+		return &report{
+			name: m.name,
+			info: "state",
+			diff: simpleDiff{
+				expected: expected,
+				actual:   actual,
+			}.String(),
+		}, false
+	}
+	return nil, true
+}
 
 // AssertState TODO.
-func (m *Marker) AssertState(t AssertT, expected MarkerState) bool {
+func (m *Marker) AssertState(t *testing.T, expected MarkerState) bool {
 	t.Helper()
-	return assert.True(t, m.Is(expected), "%s %s", m, expected)
+	if report, ok := m.checkState(expected); !ok {
+		t.Error(report)
+		return false
+	}
+	return true
 }
 
 // RequireState TODO.
-func (m *Marker) RequireState(t RequireT, expected MarkerState) {
+func (m *Marker) RequireState(t *testing.T, expected MarkerState) {
 	t.Helper()
-	if !m.AssertState(t, expected) {
-		t.FailNow()
+	if report, ok := m.checkState(expected); !ok {
+		t.Fatal(report)
 	}
 }
 
 // MarkerList TODO.
 type MarkerList []*Marker
 
-func (ml MarkerList) mapOver(f func(*Marker) bool) bool {
+// AssertState TODO.
+func (ml MarkerList) AssertState(t *testing.T, expected MarkerState) bool {
+	t.Helper()
 	res := true
 	for _, marker := range ml {
-		res = f(marker) && res
+		res = marker.AssertState(t, expected) && res
 	}
 	return res
 }
 
-// Are TODO.
-func (ml MarkerList) Are(state MarkerState) bool {
-	return ml.mapOver(func(m *Marker) bool { return m.Is(state) })
-}
-
-// AssertState TODO.
-func (ml MarkerList) AssertState(t AssertT, expected MarkerState) bool {
-	t.Helper()
-	return ml.mapOver(func(f *Marker) bool { return f.AssertState(t, expected) })
-}
-
 // RequireState TODO.
-func (ml MarkerList) RequireState(t RequireT, expected MarkerState) {
+func (ml MarkerList) RequireState(t *testing.T, expected MarkerState) {
 	t.Helper()
 	if !ml.AssertState(t, expected) {
 		t.FailNow()

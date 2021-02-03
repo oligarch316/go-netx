@@ -2,44 +2,37 @@ package synctest
 
 import (
 	"fmt"
+	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
-// DefaultTimeout TODO.
-const DefaultTimeout = 10 * time.Millisecond
+// DefaultSignalTimeout TODO.
+const DefaultSignalTimeout = 10 * time.Millisecond
 
 var (
 	// Complete TODO.
-	Complete = SignalState{
-		name:    "complete",
-		val:     true,
-		timeout: DefaultTimeout,
-	}
+	Complete = SignalState{val: true, timeout: DefaultSignalTimeout}
 
 	// Pending TODO.
-	Pending = SignalState{
-		name:    "pending",
-		val:     false,
-		timeout: DefaultTimeout,
-	}
+	Pending = SignalState{val: false, timeout: DefaultSignalTimeout}
 )
 
 // SignalState TODO.
 type SignalState struct {
-	name    string
 	val     bool
 	timeout time.Duration
 }
 
 func (ss SignalState) String() string {
-	return fmt.Sprintf("%s (timeout %s)", ss.name, ss.timeout)
+	if ss.val {
+		return "complete"
+	}
+	return "pending"
 }
 
 // After TODO.
 func (ss SignalState) After(timeout time.Duration) SignalState {
-	return SignalState{name: ss.name, val: ss.val, timeout: timeout}
+	return SignalState{val: ss.val, timeout: timeout}
 }
 
 // Signal TODO.
@@ -50,64 +43,79 @@ type Signal struct {
 
 // GoSignal TODO.
 func GoSignal(name string, f func()) Signal {
-	res := Signal{name: name, c: make(chan struct{})}
+	res := Signal{
+		name: name,
+		c:    make(chan struct{}),
+	}
+
 	go func() {
 		f()
 		close(res.c)
 	}()
+
 	return res
 }
 
 func (s Signal) String() string { return s.name }
 
-// Is TODO.
-func (s Signal) Is(state SignalState) bool {
+// State TODO.
+func (s Signal) State(timeout time.Duration) SignalState {
+	res := SignalState{timeout: timeout}
 	select {
+	case <-time.After(timeout):
 	case <-s.c:
-		return state.val
-	case <-time.After(state.timeout):
-		return !state.val
+		res.val = true
 	}
+	return res
+}
+
+func (s Signal) checkState(expected SignalState) (*report, bool) {
+	if actual := s.State(expected.timeout); expected.val != actual.val {
+		return &report{
+			name: s.name,
+			info: fmt.Sprintf("state after %s", expected.timeout),
+			diff: simpleDiff{
+				expected: expected,
+				actual:   actual,
+			}.String(),
+		}, false
+	}
+	return nil, true
 }
 
 // AssertState TODO.
-func (s Signal) AssertState(t AssertT, expected SignalState) bool {
+func (s Signal) AssertState(t *testing.T, expected SignalState) bool {
 	t.Helper()
-	return assert.True(t, s.Is(expected), "%s %s", s, expected)
+	if report, ok := s.checkState(expected); !ok {
+		t.Error(report)
+		return false
+	}
+	return true
 }
 
 // RequireState TODO.
-func (s Signal) RequireState(t RequireT, expected SignalState) {
+func (s Signal) RequireState(t *testing.T, expected SignalState) {
 	t.Helper()
-	if !s.AssertState(t, expected) {
-		t.FailNow()
+	if report, ok := s.checkState(expected); !ok {
+		t.Fatal(report)
 	}
 }
 
 // SignalList TODO.
 type SignalList []Signal
 
-func (sl SignalList) mapOver(f func(Signal) bool) bool {
+// AssertState TODO.
+func (sl SignalList) AssertState(t *testing.T, expected SignalState) bool {
+	t.Helper()
 	res := true
 	for _, signal := range sl {
-		res = f(signal) && res
+		res = signal.AssertState(t, expected) && res
 	}
 	return res
 }
 
-// Are TODO.
-func (sl SignalList) Are(state SignalState) bool {
-	return sl.mapOver(func(s Signal) bool { return s.Is(state) })
-}
-
-// AssertState TODO.
-func (sl SignalList) AssertState(t AssertT, expected SignalState) bool {
-	t.Helper()
-	return sl.mapOver(func(s Signal) bool { return s.AssertState(t, expected) })
-}
-
 // RequireState TODO.
-func (sl SignalList) RequireState(t RequireT, expected SignalState) {
+func (sl SignalList) RequireState(t *testing.T, expected SignalState) {
 	t.Helper()
 	if !sl.AssertState(t, expected) {
 		t.FailNow()

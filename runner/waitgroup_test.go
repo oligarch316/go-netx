@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/oligarch316/go-netx/synctest"
-	"github.com/oligarch316/go-netx/synctest/runner"
+	runnertest "github.com/oligarch316/go-netx/synctest/runner"
 )
 
 const waitGroupSize = 10
@@ -16,7 +16,7 @@ func TestConcurrentWaitGroupBasic(t *testing.T) {
 	// - Run() and Wait() MUST block while # Done() calls < size
 	// - Run() and Wait() MUST NOT block once # Done() calls == size
 
-	wg := runner.NewWaitGroup("wait group", waitGroupSize)
+	wg := runnertest.NewWaitGroup("wait group", waitGroupSize)
 
 	// Start Run() and Wait() routines
 	runSig := wg.Run()
@@ -37,7 +37,7 @@ func TestConcurrentWaitGroupBasic(t *testing.T) {
 	waitSig.RequireState(t, synctest.Complete)
 
 	// Check no Run() error
-	runSig.AssertEqual(t, nil)
+	runSig.AssertErrorIs(t, nil)
 }
 
 func TestConcurrentWaitGroupClose(t *testing.T) {
@@ -48,7 +48,7 @@ func TestConcurrentWaitGroupClose(t *testing.T) {
 	// - Done() MUST NOT block once Run() HAS completed
 
 	var (
-		wg          = runner.NewWaitGroup("wait group", waitGroupSize)
+		wg          = runnertest.NewWaitGroup("wait group", waitGroupSize)
 		expectedErr = fmt.Sprintf("wait group closed with 1 out of %d items pending", waitGroupSize)
 	)
 
@@ -81,8 +81,8 @@ func TestConcurrentWaitGroupClose(t *testing.T) {
 	waitSig.RequireState(t, synctest.Complete)
 
 	// Check for expected Run() error and no Close() error
-	runSig.AssertEqual(t, expectedErr)
-	closeSig.AssertEqual(t, nil)
+	runSig.AssertErrorString(t, expectedErr)
+	closeSig.AssertErrorIs(t, nil)
 
 	// Ensure a final Done() still completes
 	wg.Done(1).AssertState(t, synctest.Complete)
@@ -94,7 +94,7 @@ func TestConcurrentWaitGroupDone(t *testing.T) {
 	// - Run() and Wait() MUST NOT block once # Done() calls == size, even if
 	//   all Done() calls are made before Run() was called
 
-	wg := runner.NewWaitGroup("wait group", waitGroupSize)
+	wg := runnertest.NewWaitGroup("wait group", waitGroupSize)
 
 	// Start a Wait() routine
 	waitSig := wg.Wait()
@@ -115,5 +115,5 @@ func TestConcurrentWaitGroupDone(t *testing.T) {
 	runSig.RequireState(t, synctest.Complete)
 
 	// Check no run error
-	runSig.AssertEqual(t, nil)
+	runSig.AssertErrorIs(t, nil)
 }
