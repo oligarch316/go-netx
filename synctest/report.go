@@ -11,9 +11,20 @@ const fmtReport = `%s
 %s
 `
 
-type report struct{ name, info, diff string }
+// Report TODO.
+func Report(name, info, diff string) string {
+	return fmt.Sprintf(fmtReport, name, info, diff)
+}
 
-func (r report) String() string { return fmt.Sprintf(fmtReport, r.name, r.info, r.diff) }
+// Reporter TODO.
+type Reporter string
+
+func (r Reporter) String() string { return string(r) }
+
+// Report TODO.
+func (r Reporter) Report(info, diff string) string {
+	return Report(r.String(), info, diff)
+}
 
 const fmtSimpleDiff = `expected: %v
 actual:   %v`
@@ -31,7 +42,7 @@ func (cds complexDiffSection) String() string {
 	var b strings.Builder
 	b.WriteString(cds.title)
 	for _, item := range cds.items {
-		fmt.Fprintf(&b, "\n%s %v", cds.itemPrefix, item)
+		fmt.Fprintf(&b, "\n %s %v", cds.itemPrefix, item)
 	}
 	return b.String()
 }

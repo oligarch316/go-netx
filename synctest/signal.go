@@ -37,15 +37,15 @@ func (ss SignalState) After(timeout time.Duration) SignalState {
 
 // Signal TODO.
 type Signal struct {
-	name string
-	c    chan struct{}
+	Reporter
+	c chan struct{}
 }
 
 // GoSignal TODO.
 func GoSignal(name string, f func()) Signal {
 	res := Signal{
-		name: name,
-		c:    make(chan struct{}),
+		Reporter: Reporter(name),
+		c:        make(chan struct{}),
 	}
 
 	go func() {
@@ -55,8 +55,6 @@ func GoSignal(name string, f func()) Signal {
 
 	return res
 }
-
-func (s Signal) String() string { return s.name }
 
 // State TODO.
 func (s Signal) State(timeout time.Duration) SignalState {
@@ -69,18 +67,16 @@ func (s Signal) State(timeout time.Duration) SignalState {
 	return res
 }
 
-func (s Signal) checkState(expected SignalState) (*report, bool) {
+func (s Signal) checkState(expected SignalState) (string, bool) {
 	if actual := s.State(expected.timeout); expected.val != actual.val {
-		return &report{
-			name: s.name,
-			info: fmt.Sprintf("state after %s", expected.timeout),
-			diff: simpleDiff{
-				expected: expected,
-				actual:   actual,
-			}.String(),
-		}, false
+		info := fmt.Sprintf("state after %s", expected.timeout)
+		diff := simpleDiff{
+			expected: expected,
+			actual:   actual,
+		}
+		return s.Report(info, diff.String()), false
 	}
-	return nil, true
+	return "", true
 }
 
 // AssertState TODO.

@@ -67,7 +67,7 @@ func TestConcurrentGroupSuccess(t *testing.T) {
 	results.RequireState(t, synctest.Complete)
 
 	// Check ...
-	results.AssertErrorSet(t)                          // ... results empty
+	results.AssertErrors(t)                            // ... results empty
 	items.RunFlags().AssertState(t, synctest.Marked)   // ... all items ran
 	items.CloseFlags().AssertState(t, synctest.Marked) // ... all items closed
 }
@@ -110,7 +110,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		require.NotPanics(t, group.CloseNow)
 
 		// Check ...
-		results.AssertErrorSet(t, expectedErrs...)           // ... expected error results
+		results.AssertErrors(t, expectedErrs...)             // ... expected error results
 		items.RunFlags().AssertState(t, synctest.Marked)     // ... all items ran
 		items.CloseFlags().AssertState(t, synctest.Unmarked) // ... no items closed
 	})
@@ -138,8 +138,8 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		remainingResults.RequireState(t, synctest.Complete)
 
 		// Check ...
-		firstResult.AssertErrorSet(t, expectedErr)             // ... expected error result
-		remainingResults.AssertErrorSet(t)                     // ... no other errors
+		firstResult.AssertErrors(t, expectedErr)               // ... expected error result
+		remainingResults.AssertErrors(t)                       // ... no other errors
 		items.RunFlags().AssertState(t, synctest.Marked)       // ... all items ran
 		items[1:].CloseFlags().AssertState(t, synctest.Marked) // ... last size-1 items closed
 		items[0].CloseFlag.AssertState(t, synctest.Unmarked)   // ... first item did NOT close
@@ -177,7 +177,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		results.RequireState(t, synctest.Complete)
 
 		// Check ...
-		results.AssertErrorSet(t, expectedErr)             // ... expected error result
+		results.AssertErrors(t, expectedErr)               // ... expected error result
 		items.RunFlags().AssertState(t, synctest.Marked)   // ... all items ran
 		items.CloseFlags().AssertState(t, synctest.Marked) // ... all items closed
 	})
@@ -211,7 +211,7 @@ func TestConcurrentGroupRunError(t *testing.T) {
 		results.RequireState(t, synctest.Complete)
 
 		// Check ...
-		results.AssertErrorSet(t, forcedErr)               // ... results include post-close forced error
+		results.AssertErrors(t, forcedErr)                 // ... results include post-close forced error
 		items.RunFlags().AssertState(t, synctest.Marked)   // ... all items ran
 		items.CloseFlags().AssertState(t, synctest.Marked) // ... all items closed
 	})
@@ -249,7 +249,7 @@ func TestConcurrentGroupCloseError(t *testing.T) {
 	items[0].Kill()
 
 	// Check ...
-	results.AssertErrorSet(t, expectedErr)             // ... expected error result
+	results.AssertErrors(t, expectedErr)               // ... expected error result
 	items.RunFlags().AssertState(t, synctest.Marked)   // ... all items ran
 	items.CloseFlags().AssertState(t, synctest.Marked) // ... all items closed
 }
@@ -291,13 +291,13 @@ func TestConcurrentGroupLateResultsConsumer(t *testing.T) {
 	items[1].Kill()
 
 	// Check ...
-	results.AssertErrorSet(t, expectedErrs...)             // ... expected error results
+	results.AssertErrors(t, expectedErrs...)               // ... expected error results
 	items.RunFlags().AssertState(t, synctest.Marked)       // ... all items ran
 	items[1:].CloseFlags().AssertState(t, synctest.Marked) // ... last size-1 items closed
 
 	// NOTE:
 	// Don't make any assertions about items[0].CloseFlag Marked/Unmarked.
-	// Without reading the result from Kill() before calling group.Close()
+	// Without reading the result from items[0].Kill() before calling group.Close()
 	// whether items[0].Close() is called remains ambiguous.
 	// Specific behavior for this case is tested in RunError/one_before_close.
 }
@@ -329,7 +329,7 @@ func TestConcurrentGroupTimelyResults(t *testing.T) {
 
 		// ... check single result complete with expected error
 		result.RequireState(t, synctest.Complete)
-		result.AssertErrorSet(t, expectedErr)
+		result.AssertErrors(t, expectedErr)
 	}
 
 	// Start result consumer routine for remaining results
@@ -337,5 +337,5 @@ func TestConcurrentGroupTimelyResults(t *testing.T) {
 
 	// Check remaining results complete and empty
 	remainder.RequireState(t, synctest.Complete)
-	remainder.AssertErrorSet(t)
+	remainder.AssertErrors(t)
 }

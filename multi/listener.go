@@ -79,10 +79,32 @@ func (mr *mergeRunner) Run() error {
 	for {
 		conn, err := mr.l.Accept()
 		if err != nil {
+			// TODO: check for interface{ Temporary() bool } instead of net.Error here
 			ne, ok := err.(net.Error)
 			if !ok || !ne.Temporary() {
 				// TODO: What do we expect as a result of mr.l.Close()?
 				// Can we replace that expected error with nil here?
+
+				// Upon further reading, we may need our very own signal here just
+				// to indicate the error is expected and comes from mr.l.Close() called
+				// from ml.Close().
+				// Meaning something like mr.closeChan becomes mr.forceCloseChan? and we
+				// introduce some sort of mr.closingChan here? To do:
+				// select {
+				// case <-mr.closing:
+				// 	=> All good, return nil
+				// default:
+				// 	=> Not good, return that error
+				// }
+				// And then mr.Close() does `close(mr.closingChan)` 1st thing?
+				//
+				// Another thought, this can be accomplished by just wrapping the listener to
+				// do the same logic and returning a defined and exported known error. And if
+				// we're doing that, maybe netx itself could own that? Actually no, bad idea,
+				// but wrapping the netx.listener for this still might be a good move.
+				// Maybe there's a clean way to wrap all errors such that the Temporary() checks
+				// and even retry logic are made smoother as well?
+
 				return err
 			}
 

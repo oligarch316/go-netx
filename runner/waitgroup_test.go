@@ -37,7 +37,7 @@ func TestConcurrentWaitGroupBasic(t *testing.T) {
 	waitSig.RequireState(t, synctest.Complete)
 
 	// Check no Run() error
-	runSig.AssertErrorIs(t, nil)
+	runSig.AssertError(t, nil)
 }
 
 func TestConcurrentWaitGroupClose(t *testing.T) {
@@ -81,8 +81,8 @@ func TestConcurrentWaitGroupClose(t *testing.T) {
 	waitSig.RequireState(t, synctest.Complete)
 
 	// Check for expected Run() error and no Close() error
-	runSig.AssertErrorString(t, expectedErr)
-	closeSig.AssertErrorIs(t, nil)
+	runSig.AssertError(t, expectedErr)
+	closeSig.AssertError(t, nil)
 
 	// Ensure a final Done() still completes
 	wg.Done(1).AssertState(t, synctest.Complete)
@@ -115,5 +115,5 @@ func TestConcurrentWaitGroupDone(t *testing.T) {
 	runSig.RequireState(t, synctest.Complete)
 
 	// Check no run error
-	runSig.AssertErrorIs(t, nil)
+	runSig.AssertError(t, nil)
 }
