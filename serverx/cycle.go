@@ -1,175 +1,84 @@
 package serverx
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 )
 
-// Cycle TODO.
-type Cycle []ServiceID
+type idList []ServiceID
 
-func (c Cycle) Error() string { return fmt.Sprintf("dependency cycle: %s", c.String()) }
+func (il idList) Len() int           { return len(il) }
+func (il idList) Swap(i, j int)      { il[i], il[j] = il[j], il[i] }
+func (il idList) Less(i, j int) bool { return il[i].String() < il[j].String() }
 
-func (c Cycle) String() string {
-	nItems := len(c)
-	if nItems < 1 {
-		return "<empty>"
-	}
+type cycleError []ServiceID
 
-	temp := make([]string, nItems+1)
-	temp[nItems] = c[0].String()
+func (ce cycleError) complete() bool { return len(ce) > 1 && ce[0] == ce[len(ce)-1] }
 
-	for i, id := range c {
-		temp[i] = id.String()
-	}
-
-	return strings.Join(temp, " → ")
-}
-
-func (c Cycle) normalize() Cycle {
-	nItems := len(c)
-
-	switch nItems {
-	case 0:
-		return nil
-	case 1:
-		return c
-	}
-
+func (ce cycleError) Error() string {
 	var (
-		bestIdx = 0
-		bestVal = c[0].String()
+		n        = len(ce)
+		reversed = make([]string, n)
 	)
 
-	for i := 1; i < nItems; i++ {
-		if curVal := c[i].String(); curVal < bestVal {
-			bestIdx, bestVal = i, curVal
-		}
+	for i := 0; i < n; i++ {
+		reversed[i] = ce[n-(i+1)].String()
 	}
 
-	return Cycle(append(c[bestIdx:], c[:bestIdx]...))
+	return strings.Join(reversed, " → ")
 }
 
-// CycleList TODO.
-type CycleList []Cycle
-
-func (cl CycleList) Error() string {
-	switch nItems := len(cl); nItems {
-	case 0:
-		return "dependency cycles: <empty>"
-	case 1:
-		return cl[0].Error()
-	default:
-		return fmt.Sprintf("%d dependency cycles, including: %s", nItems, cl[0].String())
-	}
-}
-
-func (cl CycleList) normalize() CycleList {
-	var res CycleList
-
-	for _, c := range cl {
-		res = append(res, c.normalize())
-	}
-
-	sort.Slice(res, func(i, j int) bool {
-		iC, jC := res[i], res[j]
-
-		if iLen, jLen := len(iC), len(jC); iLen != jLen {
-			return iLen < jLen
-		}
-
-		for idx, iItem := range iC {
-			if iStr, jStr := iItem.String(), jC[idx].String(); iStr != jStr {
-				return iStr < jStr
-			}
-		}
-
-		return false
-	})
-
-	return res
-}
-
-func findDependencyCycles(params serviceParams) CycleList {
-	// Short Summary | DFS, Detect back-edges, Memoize partial cycles detected per ServiceID
-
+func findDependencyCycles(params serviceParams) error {
 	var (
-		// Presence in map => visited
-		// "false" value => search in progress
-		// "true" value => search completed
-		gCompleted = make(map[ServiceID]bool)
-
-		// Updated upon search complete with search results
-		gMemo = make(map[ServiceID]CycleList)
-
-		// Last value in a (partial) cycle will be the vistited but incomplete "trigger" id
-		triggerOf = func(c Cycle) ServiceID { return c[len(c)-1] }
-
-		gCycles CycleList
-		search  func(ServiceID) CycleList
+		visited = make(map[ServiceID]bool)
+		recurse func(ServiceID) cycleError
 	)
 
-	search = func(svcID ServiceID) CycleList {
-		if completed, visited := gCompleted[svcID]; visited {
-			// Previously visited ...
-
-			if !completed {
-				// ... but search incomplete ==> cycle "trigger" encountered (back-edge)
-				return CycleList{{svcID}}
+	recurse = func(svcID ServiceID) cycleError {
+		if complete, exists := visited[svcID]; exists {
+			if complete {
+				return nil
 			}
 
-			// ... and search complete ==> use previous results stored in gMemo
-
-			var res CycleList
-
-			for _, memCycle := range gMemo[svcID] {
-				if !gCompleted[triggerOf(memCycle)] {
-					// Persist only those results where the "trigger" remains incomplete
-					res = append(res, memCycle)
-				}
-			}
-
-			// Update stored results to the filtered list
-			gMemo[svcID] = res
-			return res
+			return cycleError{svcID}
 		}
 
-		// Not previously visited
-
-		var res CycleList
-
-		// Mark visited
-		gCompleted[svcID] = false
+		visited[svcID] = false
+		defer func() { visited[svcID] = true }()
 
 		if param, ok := params[svcID]; ok {
+			depIDs := make(idList, 0, len(param.deps))
 			for depID := range param.deps {
-				for _, partialCycle := range search(depID) {
-					// Recursively search each dependency
+				depIDs = append(depIDs, depID)
+			}
 
-					if triggerOf(partialCycle) == svcID {
-						// Any cycles "triggered" by "me" are complete, add them to global results
-						gCycles = append(gCycles, partialCycle)
-						continue
+			sort.Stable(depIDs)
+
+			for _, depID := range depIDs {
+				if cycle := recurse(depID); cycle != nil {
+					if cycle.complete() {
+						return cycle
 					}
-
-					// Augment all other cycles and pass them up
-					res = append(res, append(Cycle{svcID}, partialCycle...))
+					return append(cycle, svcID)
 				}
 			}
 		}
 
-		// Mark search complete
-		gCompleted[svcID] = true
-
-		// Store results
-		gMemo[svcID] = res
-		return res
+		return nil
 	}
 
+	svcIDs := make(idList, 0, len(params))
 	for svcID := range params {
-		search(svcID)
+		svcIDs = append(svcIDs, svcID)
 	}
 
-	return gCycles.normalize()
+	sort.Stable(svcIDs)
+
+	for _, svcID := range svcIDs {
+		if err := recurse(svcID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
