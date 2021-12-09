@@ -20,11 +20,14 @@ type Service interface {
 }
 
 type service struct {
+	// Run logic
 	svc Service
 	ml  *multi.Listener
 
-	dependants, dependsOn []*service
-	signal                func()
+	// Dependency synchronization
+	dependants          []*service // those which depend upon me
+	dependees           []*service // those which I depend upon
+	dependantDoneSignal func()     // mechanism for dependants to inform me of completion
 }
 
 func newService(svc Service, ml *multi.Listener) *service {
@@ -32,63 +35,69 @@ func newService(svc Service, ml *multi.Listener) *service {
 }
 
 func (s *service) DependOn(svc *service) {
-	s.dependsOn = append(s.dependsOn, svc)
+	s.dependees = append(s.dependees, svc)
 	svc.dependants = append(svc.dependants, s)
 }
 
 func (s *service) Runners() []runner.Item {
+	// ----- "Glue" runners
+	// > wait groups for synchronization purposes
 	var (
-		servicesWG  = runner.NewWaitGroup(len(s.dependants))
-		listenersWG = runner.NewWaitGroup(s.ml.Len())
-
-		serviceRunner = runner.New(
-			// Run() error
-			func() error {
-				defer func() {
-					for _, svc := range s.dependsOn {
-						// TODO: Log/track/surface the possible error here somehow
-						svc.signalDone()
-					}
-				}()
-				return s.svc.Serve(s.ml)
-			},
-
-			// Close(context.Context) error
-			func(ctx context.Context) error {
-				listenersWG.Wait()
-				return s.svc.Close(ctx)
-			},
-		)
-
-		res = []runner.Item{servicesWG, listenersWG, serviceRunner}
+		dependantsWG = runner.NewWaitGroup(len(s.dependants))
+		listenersWG  = runner.NewWaitGroup(s.ml.Len())
+		res          = []runner.Item{dependantsWG, listenersWG}
 	)
 
-	for _, item := range s.ml.Runners() {
-		listenRunner := runner.New(
-			// Run() error
-			func() error {
-				defer listenersWG.Done()
-				return item.Run()
-			},
-
-			// Close(context.Context) error
-			func(ctx context.Context) error {
-				servicesWG.Wait()
-				return item.Close(ctx)
-			},
-		)
-
-		res = append(res, listenRunner)
+	// ----- Service runner
+	// > svc.Serve(...) and svc.Close(...) wrapped with glue logic
+	signalDependees := func() {
+		for _, dependee := range s.dependees {
+			// TODO: Log/track/surface the possible error here somehow
+			dependee.signalDependantDone()
+		}
 	}
 
-	s.signal = servicesWG.Done
+	serviceRun := func() error {
+		defer signalDependees()
+		return s.svc.Serve(s.ml)
+	}
+
+	serviceClose := func(ctx context.Context) error {
+		listenersWG.Wait()
+		return s.svc.Close(ctx)
+	}
+
+	res = append(res, runner.New(serviceRun, serviceClose))
+
+	// ----- Listener runners
+	// > ml.Runners() wrapped with glue logic
+	for _, item := range s.ml.Runners() {
+		var (
+			origRun   = item.Run
+			origClose = item.Close
+		)
+
+		wrappedRun := func() error {
+			defer listenersWG.Done()
+			return origRun()
+		}
+
+		wrappedClose := func(ctx context.Context) error {
+			dependantsWG.Wait()
+			return origClose(ctx)
+		}
+
+		res = append(res, runner.New(wrappedRun, wrappedClose))
+	}
+
+	s.dependantDoneSignal = dependantsWG.Done
 
 	return res
 }
 
-func (s *service) signalDone() error {
-	if s.signal != nil {
-		s.signal()
+func (s *service) signalDependantDone() error {
+	if s.dependantDoneSignal != nil {
+		s.dependantDoneSignal()
 		return nil
 	}
 

@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/runner"
 )
 
 // NetworkName TODO.
@@ -53,7 +52,7 @@ func (ml *mergeListener) Close() error {
 	return nil
 }
 
-func (ml *mergeListener) runner(l net.Listener) runner.Item {
+func (ml *mergeListener) runner(l net.Listener) *mergeRunner {
 	return &mergeRunner{
 		l:      l,
 		mergeL: ml,
@@ -138,6 +137,9 @@ func (mr *mergeRunner) Close(ctx context.Context) error {
 	return nil
 }
 
+// Addr TODO.
+func (mr mergeRunner) Addr() net.Addr { return mr.l.Addr() }
+
 // Listener TODO.
 type Listener struct {
 	mergeListener
@@ -156,8 +158,8 @@ func NewListener(ls ...netx.Listener) *Listener {
 }
 
 // Runners TODO.
-func (l *Listener) Runners() []runner.Item {
-	res := make([]runner.Item, l.Len())
+func (l *Listener) Runners() []*mergeRunner {
+	res := make([]*mergeRunner, l.Len())
 
 	for i, item := range l.listeners {
 		res[i] = l.runner(item)
