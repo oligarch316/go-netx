@@ -2,40 +2,75 @@ package serverx
 
 import (
 	"context"
-	"fmt"
-	"net"
 
+	"github.com/oligarch316/go-netx"
 	"github.com/oligarch316/go-netx/multi"
 	"github.com/oligarch316/go-netx/runner"
+	"github.com/oligarch316/go-netx/servicex"
 )
 
-// ServiceID TODO.
-type ServiceID fmt.Stringer
+type dependencySet map[servicex.ID]struct{}
 
-// Service TODO.
-type Service interface {
-	ID() ServiceID
-	Serve(net.Listener) error
-	Close(context.Context) error
+func (ds dependencySet) Append(ids ...servicex.ID) {
+	for _, id := range ids {
+		ds[id] = struct{}{}
+	}
+}
+
+type serviceParamData struct {
+	listener *multi.Listener
+	deps     dependencySet
+}
+
+// ServiceParams TODO.
+type ServiceParams struct {
+	services map[servicex.ID]*serviceParamData
+}
+
+func newServiceParams() ServiceParams {
+	return ServiceParams{services: make(map[servicex.ID]*serviceParamData)}
+}
+
+func (sp *ServiceParams) requireData(id servicex.ID) *serviceParamData {
+	res, ok := sp.services[id]
+	if !ok {
+		res = &serviceParamData{
+			listener: multi.NewListener(),
+			deps:     make(dependencySet),
+		}
+		sp.services[id] = res
+	}
+	return res
+}
+
+func (sp *ServiceParams) appendListeners(id servicex.ID, ls ...netx.Listener) {
+	sp.requireData(id).listener.Append(ls...)
+}
+
+func (sp *ServiceParams) appendDependencies(id servicex.ID, depIDs ...servicex.ID) {
+	sp.requireData(id).deps.Append(depIDs...)
 }
 
 type service struct {
-	// Run logic
-	svc Service
+	svc servicex.Service
 	ml  *multi.Listener
 
-	// Dependency synchronization
-	dependants          []*service // those which depend upon me
-	dependees           []*service // those which I depend upon
-	dependantDoneSignal func()     // mechanism for dependants to inform me of completion
+	dependants, requirements []*service
+	dependantDoneSignal      func()
 }
 
-func newService(svc Service, ml *multi.Listener) *service {
+func newService(svc servicex.Service, ml *multi.Listener) *service {
 	return &service{svc: svc, ml: ml}
 }
 
+func (s *service) signalRequirements() {
+	for _, req := range s.requirements {
+		req.dependantDoneSignal()
+	}
+}
+
 func (s *service) DependOn(svc *service) {
-	s.dependees = append(s.dependees, svc)
+	s.requirements = append(s.requirements, svc)
 	svc.dependants = append(svc.dependants, s)
 }
 
@@ -48,58 +83,45 @@ func (s *service) Runners() []runner.Item {
 		res          = []runner.Item{dependantsWG, listenersWG}
 	)
 
+	s.dependantDoneSignal = dependantsWG.Done
+
 	// ----- Service runner
 	// > svc.Serve(...) and svc.Close(...) wrapped with glue logic
-	signalDependees := func() {
-		for _, dependee := range s.dependees {
-			// TODO: Log/track/surface the possible error here somehow
-			dependee.signalDependantDone()
+	var (
+		baseServiceRunner = servicex.NewRunner(s.ml, s.svc)
+
+		wrappedServiceRun = func() error {
+			defer s.signalRequirements()
+			return baseServiceRunner.Run()
 		}
-	}
 
-	serviceRun := func() error {
-		defer signalDependees()
-		return s.svc.Serve(s.ml)
-	}
+		wrappedServiceClose = func(ctx context.Context) error {
+			listenersWG.Wait()
+			return baseServiceRunner.Close(ctx)
+		}
+	)
 
-	serviceClose := func(ctx context.Context) error {
-		listenersWG.Wait()
-		return s.svc.Close(ctx)
-	}
-
-	res = append(res, runner.New(serviceRun, serviceClose))
+	res = append(res, runner.New(wrappedServiceRun, wrappedServiceClose))
 
 	// ----- Listener runners
 	// > ml.Runners() wrapped with glue logic
 	for _, item := range s.ml.Runners() {
 		var (
-			origRun   = item.Run
-			origClose = item.Close
+			baseRunner = item
+
+			wrappedRun = func() error {
+				defer listenersWG.Done()
+				return baseRunner.Run()
+			}
+
+			wrappedClose = func(ctx context.Context) error {
+				dependantsWG.Wait()
+				return baseRunner.Close(ctx)
+			}
 		)
-
-		wrappedRun := func() error {
-			defer listenersWG.Done()
-			return origRun()
-		}
-
-		wrappedClose := func(ctx context.Context) error {
-			dependantsWG.Wait()
-			return origClose(ctx)
-		}
 
 		res = append(res, runner.New(wrappedRun, wrappedClose))
 	}
 
-	s.dependantDoneSignal = dependantsWG.Done
-
 	return res
-}
-
-func (s *service) signalDependantDone() error {
-	if s.dependantDoneSignal != nil {
-		s.dependantDoneSignal()
-		return nil
-	}
-
-	return fmt.Errorf("serverx: signalDone() called on uninitialized service (%s)", s.svc.ID())
 }

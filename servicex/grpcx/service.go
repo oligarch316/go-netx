@@ -6,22 +6,21 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/oligarch316/go-netx/serverx"
+	"github.com/oligarch316/go-netx/servicex"
 	"google.golang.org/grpc"
 )
 
+type namespace struct{}
+
+func (n namespace) String() string { return "grpcx" }
+
+// ID TODO.
+var ID servicex.ID = namespace{}
+
 var errServiceClosed = errors.New("grpcx: service closed")
 
-type (
-	// Handler TODO.
-	Handler interface{ Register(*grpc.Server) }
-
-	// HandlerFunc TODO.
-	HandlerFunc func(*grpc.Server)
-)
-
-// Register TODO.
-func (hf HandlerFunc) Register(s *grpc.Server) { hf(s) }
+// ServiceOption TODO.
+type ServiceOption func(*ServiceParams)
 
 // ServiceParams TODO.
 type ServiceParams struct {
@@ -36,6 +35,15 @@ func (sp ServiceParams) build() *grpc.Server {
 	}
 	return res
 }
+
+// Handler TODO.
+type Handler interface{ Register(*grpc.Server) }
+
+// HandlerFunc TODO.
+type HandlerFunc func(*grpc.Server)
+
+// Register TODO.
+func (hf HandlerFunc) Register(s *grpc.Server) { hf(s) }
 
 // Service TODO.
 type Service struct {
@@ -53,7 +61,7 @@ func NewService(opts ...ServiceOption) *Service {
 }
 
 // ID TODO.
-func (s Service) ID() serverx.ServiceID { return ID }
+func (s Service) ID() servicex.ID { return ID }
 
 // Serve TODO.
 func (s *Service) Serve(l net.Listener) error {

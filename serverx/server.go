@@ -6,30 +6,54 @@ import (
 	"fmt"
 
 	"github.com/oligarch316/go-netx/runner"
+	"github.com/oligarch316/go-netx/servicex"
 )
 
-var errNoSuchServiceID = errors.New("serverx: no such service id")
+var (
+	errNoSuchService     = errors.New("serverx: no such service")
+	errMissingListener   = errors.New("serverx: missing listener")
+	errDuplicateService  = errors.New("serverx: duplicate service")
+	errMissingDependency = errors.New("serverx: missing dependency")
+)
+
+// Option TODO.
+type Option func(*Params)
+
+// Params TODO.
+type Params struct {
+	IgnoreParams
+	ServiceParams
+}
+
+// IgnoreParams TODO.
+type IgnoreParams struct {
+	IgnoreMissingListeners    bool
+	IgnoreDuplicateServices   bool
+	IgnoreMissingDependencies bool
+}
 
 // Server TODO.
 type Server struct {
-	svcParams serviceParams
-	runGroup  *runner.Group
+	params   Params
+	runGroup *runner.Group
 }
 
 // NewServer TODO.
 func NewServer(opts ...Option) (*Server, error) {
-	var (
-		res    = &Server{svcParams: make(serviceParams)}
-		params = Params{ParamsService: res.svcParams}
-	)
-
-	for _, opt := range opts {
-		if err := opt(&params); err != nil {
-			return nil, err
-		}
+	params := Params{
+		IgnoreParams: IgnoreParams{
+			IgnoreMissingListeners:    false,
+			IgnoreDuplicateServices:   false,
+			IgnoreMissingDependencies: false,
+		},
+		ServiceParams: newServiceParams(),
 	}
 
-	return res, findDependencyCycles(res.svcParams)
+	for _, opt := range opts {
+		opt(&params)
+	}
+
+	return &Server{params: params}, findDependencyCycles(params.ServiceParams)
 }
 
 // Close TODO.
@@ -40,43 +64,48 @@ func (s *Server) Close(ctx context.Context) {
 }
 
 // DialSet TODO.
-func (s *Server) DialSet(id ServiceID) (*DialSet, error) {
-	if ml, ok := s.svcParams.mlOk(id); ok {
-		return &DialSet{ml.Set}, nil
+func (s *Server) DialSet(id servicex.ID) (*DialSet, error) {
+	if svcParams, ok := s.params.services[id]; ok {
+		return &DialSet{svcParams.listener.Set}, nil
 	}
-	return nil, fmt.Errorf("%w: %s", errNoSuchServiceID, id)
+
+	return nil, fmt.Errorf("%w: %s", errNoSuchService, id)
 }
 
 // Serve TODO.
-func (s *Server) Serve(svcs ...Service) <-chan error {
-	svcMap := make(map[ServiceID]*service)
+func (s *Server) Serve(svcs ...servicex.Service) (<-chan error, error) {
+	svcMap := make(map[servicex.ID]*service)
 
-	// Combine arguments with associated multi listeners to build finalized services
+	// Combine arguments with associated params to build finalized services
 	for _, svc := range svcs {
-		svcID := svc.ID()
+		id := svc.ID()
 
-		ml, ok := s.svcParams.mlOk(svcID)
+		svcParams, ok := s.params.services[id]
 		if !ok {
-			// Skip those services with no listeners available
+			if s.params.IgnoreMissingListeners {
+				continue
+			}
 
-			// TODO: Log/track/surface this somehow
-			continue
+			return nil, fmt.Errorf("%w: %s", errMissingListener, id)
 		}
 
-		if _, exists := svcMap[svcID]; exists {
-			// TODO: Log/track/surface this somehow
+		if _, exists := svcMap[id]; exists && !s.params.IgnoreDuplicateServices {
+			return nil, fmt.Errorf("%w: %s", errDuplicateService, id)
 		}
 
-		svcMap[svcID] = newService(svc, ml)
+		svcMap[id] = newService(svc, svcParams.listener)
 	}
 
 	// Build service dependencies
 	for id, svc := range svcMap {
-		for depID := range s.svcParams[id].deps {
+		for depID := range s.params.services[id].deps {
 			depSvc, ok := svcMap[depID]
 			if !ok {
-				// TODO: Log/track/surface this somehow
-				continue
+				if s.params.IgnoreMissingDependencies {
+					continue
+				}
+
+				return nil, fmt.Errorf("%w: %s → %s", errMissingDependency, id, depID)
 			}
 
 			svc.DependOn(depSvc)
@@ -90,5 +119,5 @@ func (s *Server) Serve(svcs ...Service) <-chan error {
 	}
 
 	// Start the run group
-	return s.runGroup.Run()
+	return s.runGroup.Run(), nil
 }

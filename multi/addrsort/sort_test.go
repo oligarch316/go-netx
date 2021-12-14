@@ -31,7 +31,7 @@ func TestAddrSort(t *testing.T) {
 			addr("nB", "a1"),
 		}
 
-		cmpList = addrsort.CompareList{
+		cmpList = addrsort.Ordering{
 			addrsort.ByPriorityNetwork("nP1", "nP2"),
 			addrsort.ByPriorityAddress("aP1", "aP2"),
 			addrsort.ByPriorityNetwork("nP3"),

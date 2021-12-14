@@ -3,10 +3,22 @@ package serverx
 import (
 	"testing"
 
+	"github.com/oligarch316/go-netx/servicex"
 	"github.com/stretchr/testify/assert"
 )
 
-type depMap map[ServiceID][]ServiceID
+type testID string
+
+func (ti testID) String() string { return string(ti) }
+
+var (
+	idA = testID("A")
+	idB = testID("B")
+	idC = testID("C")
+	idD = testID("D")
+)
+
+type depMap map[servicex.ID][]servicex.ID
 
 func TestServerDependencyCycles(t *testing.T) {
 	subtests := []struct {
@@ -63,9 +75,9 @@ func TestServerDependencyCycles(t *testing.T) {
 		t.Run(subtest.name, func(t *testing.T) {
 			t.Parallel()
 
-			params := make(serviceParams)
+			params := newServiceParams()
 			for k, v := range subtest.deps {
-				params.AddDependencies(k, v...)
+				params.appendDependencies(k, v...)
 			}
 
 			assert.Equal(t, subtest.expected, findDependencyCycles(params))

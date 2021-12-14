@@ -7,10 +7,20 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/oligarch316/go-netx/serverx"
+	"github.com/oligarch316/go-netx/servicex"
 )
 
+type namespace struct{}
+
+func (n namespace) String() string { return "httpx" }
+
+// ID TODO.
+var ID servicex.ID = namespace{}
+
 var errServiceClosed = errors.New("httpx: service closed")
+
+// ServiceOption TODO.
+type ServiceOption func(*ServiceParams)
 
 // ServiceParams TODO.
 type ServiceParams struct {
@@ -43,7 +53,7 @@ func NewService(opts ...ServiceOption) *Service {
 }
 
 // ID TODO.
-func (Service) ID() serverx.ServiceID { return ID }
+func (Service) ID() servicex.ID { return ID }
 
 // Serve TODO.
 func (s *Service) Serve(l net.Listener) error {

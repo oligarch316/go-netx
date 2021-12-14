@@ -14,7 +14,7 @@ import (
 const rsvSchemeDNS = "dns"
 
 var (
-	rsvAddrPrefix    = fmt.Sprintf("_%s_:", id.Namespace)
+	rsvAddrPrefix    = fmt.Sprintf("_%s_:", ID)
 	rsvAddrPrefixLen = len(rsvAddrPrefix)
 )
 
@@ -32,7 +32,7 @@ func rsvParseHash(s string) (local bool, h multi.Hash, err error) {
 // ResolverParams TODO.
 type ResolverParams struct {
 	SchemeName, DNSHostName *string
-	AddressOrder            addrsort.CompareList
+	AddressOrder            addrsort.Ordering
 }
 
 func (rp ResolverParams) build(dSet *serverx.DialSet) []resolver.Builder {
@@ -59,7 +59,7 @@ func (rp ResolverParams) build(dSet *serverx.DialSet) []resolver.Builder {
 }
 
 type rsvSet struct {
-	baseSorter addrsort.CompareList
+	baseSorter addrsort.Ordering
 	set        *serverx.DialSet
 }
 
@@ -75,7 +75,7 @@ func (rs rsvSet) process(endpoint string) (*resolver.State, error) {
 
 	if cleaned := strings.Trim(endpoint, "/"); cleaned != "" {
 		cmp := addrsort.ByPriorityNetwork(strings.Split(cleaned, "/")...)
-		sorter = append(addrsort.CompareList{cmp}, sorter...)
+		sorter = append(addrsort.Ordering{cmp}, sorter...)
 	}
 
 	var (
