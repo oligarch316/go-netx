@@ -1,6 +1,6 @@
 package addrsort
 
-import "github.com/oligarch316/go-netx/multi"
+import "github.com/oligarch316/go-netx/listenerx/multi"
 
 // Comparer TODO.
 type Comparer func(x, y multi.Addr) (less, equal bool)

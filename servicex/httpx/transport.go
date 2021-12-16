@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/oligarch316/go-netx/multi/addrsort"
+	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
 	"github.com/oligarch316/go-netx/servicex"
 )

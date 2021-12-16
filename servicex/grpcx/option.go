@@ -2,7 +2,7 @@ package grpcx
 
 import (
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/multi/addrsort"
+	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
 	"google.golang.org/grpc"
 )

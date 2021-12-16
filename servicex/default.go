@@ -2,7 +2,7 @@ package servicex
 
 import (
 	"github.com/oligarch316/go-netx/listenerx"
-	"github.com/oligarch316/go-netx/multi/addrsort"
+	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 )
 
 var (

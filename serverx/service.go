@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/multi"
+	"github.com/oligarch316/go-netx/listenerx/multi"
 	"github.com/oligarch316/go-netx/runner"
 	"github.com/oligarch316/go-netx/servicex"
 )

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net"
 
-	"github.com/oligarch316/go-netx/multi"
-	"github.com/oligarch316/go-netx/multi/addrsort"
+	"github.com/oligarch316/go-netx/listenerx/multi"
+	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 )
 
 var errUnknownDialFailure = errors.New("serverx: unknown dial failure")

@@ -3,7 +3,7 @@ package addrsort
 import (
 	"sort"
 
-	"github.com/oligarch316/go-netx/multi"
+	"github.com/oligarch316/go-netx/listenerx/multi"
 )
 
 // Ordering TODO.
