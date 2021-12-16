@@ -11,7 +11,7 @@ import (
 	"github.com/oligarch316/go-netx/serverx"
 )
 
-var dialLocalHostKey = fmt.Sprintf("_%s_:0", id.Namespace)
+var dialLocalHostKey = fmt.Sprintf("_%s_:0", ID)
 
 type dialContextFunc func(context.Context, string, string) (net.Conn, error)
 
@@ -47,9 +47,9 @@ type dialFactory struct {
 	set    *serverx.DialSet
 }
 
-func newDialFactory(set *serverx.DialSet, cmp addrsort.CompareList) dialFactory {
+func newDialFactory(set *serverx.DialSet, cmps []addrsort.Comparer) dialFactory {
 	return dialFactory{
-		hashes: set.Resolve(cmp...),
+		hashes: set.Resolve(cmps...),
 		set:    set,
 	}
 }

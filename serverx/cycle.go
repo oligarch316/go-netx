@@ -3,15 +3,17 @@ package serverx
 import (
 	"sort"
 	"strings"
+
+	"github.com/oligarch316/go-netx"
 )
 
-type idList []ServiceID
+type idList []netx.ServiceID
 
 func (il idList) Len() int           { return len(il) }
 func (il idList) Swap(i, j int)      { il[i], il[j] = il[j], il[i] }
 func (il idList) Less(i, j int) bool { return il[i].String() < il[j].String() }
 
-type cycleError []ServiceID
+type cycleError []netx.ServiceID
 
 func (ce cycleError) complete() bool { return len(ce) > 1 && ce[0] == ce[len(ce)-1] }
 
@@ -28,13 +30,13 @@ func (ce cycleError) Error() string {
 	return strings.Join(reversed, " → ")
 }
 
-func findDependencyCycles(params serviceParams) error {
+func findDependencyCycles(params ServiceParams) error {
 	var (
-		visited = make(map[ServiceID]bool)
-		recurse func(ServiceID) cycleError
+		visited = make(map[netx.ServiceID]bool)
+		recurse func(netx.ServiceID) cycleError
 	)
 
-	recurse = func(svcID ServiceID) cycleError {
+	recurse = func(svcID netx.ServiceID) cycleError {
 		if complete, exists := visited[svcID]; exists {
 			if complete {
 				return nil
@@ -46,7 +48,7 @@ func findDependencyCycles(params serviceParams) error {
 		visited[svcID] = false
 		defer func() { visited[svcID] = true }()
 
-		if param, ok := params[svcID]; ok {
+		if param, ok := params.services[svcID]; ok {
 			depIDs := make(idList, 0, len(param.deps))
 			for depID := range param.deps {
 				depIDs = append(depIDs, depID)
@@ -55,11 +57,11 @@ func findDependencyCycles(params serviceParams) error {
 			sort.Stable(depIDs)
 
 			for _, depID := range depIDs {
-				if cycle := recurse(depID); cycle != nil {
-					if cycle.complete() {
-						return cycle
+				if err := recurse(depID); err != nil {
+					if err.complete() {
+						return err
 					}
-					return append(cycle, svcID)
+					return append(err, svcID)
 				}
 			}
 		}
@@ -67,8 +69,8 @@ func findDependencyCycles(params serviceParams) error {
 		return nil
 	}
 
-	svcIDs := make(idList, 0, len(params))
-	for svcID := range params {
+	svcIDs := make(idList, 0, len(params.services))
+	for svcID := range params.services {
 		svcIDs = append(svcIDs, svcID)
 	}
 

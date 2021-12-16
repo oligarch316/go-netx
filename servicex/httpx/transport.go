@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/oligarch316/go-netx/internal/servicex"
 	"github.com/oligarch316/go-netx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
+	"github.com/oligarch316/go-netx/servicex"
 )
 
 const (
@@ -14,24 +14,28 @@ const (
 	transportSchemeHTTPS = "https"
 )
 
+// TransportOption TODO.
+type TransportOption func(*TransportParams)
+
 // TransportParams TODO.
 type TransportParams struct {
 	HostName, SchemeName, SchemeTLSName *string
-	AddressOrder                        addrsort.CompareList
+	AddressOrder                        addrsort.Ordering
 	HTTPTransportOptions                []func(*http.Transport)
 }
 
 func defaultTransportParams() TransportParams {
 	var (
-		key = servicex.DefaultKey
-		cmp = addrsort.ByPriorityNetwork(servicex.DefaultNetworkPriority...)
+		schemeName = servicex.DefaultDialKey
+		cmp        = servicex.DefaultDialNetworkPriority
 	)
 
 	return TransportParams{
-		HostName:      nil,
-		SchemeTLSName: nil,
-		SchemeName:    &key,
-		AddressOrder:  addrsort.CompareList{cmp},
+		HostName:             nil,
+		SchemeTLSName:        nil,
+		SchemeName:           &schemeName,
+		AddressOrder:         addrsort.Ordering{cmp},
+		HTTPTransportOptions: nil,
 	}
 }
 

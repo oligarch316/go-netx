@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/oligarch316/go-netx/internal/servicex"
 	"github.com/oligarch316/go-netx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
+	"github.com/oligarch316/go-netx/servicex"
 	"google.golang.org/grpc"
 )
+
+// DialerOption TODO.
+type DialerOption func(*DialerParams)
 
 // DialerParams TODO.
 type DialerParams struct {
@@ -19,15 +22,15 @@ type DialerParams struct {
 
 func defaultDialerParams() DialerParams {
 	var (
-		key = servicex.DefaultKey
-		cmp = addrsort.ByPriorityNetwork(servicex.DefaultNetworkPriority...) // TODO: have servicex export a cmp directly
+		schemeName = servicex.DefaultDialKey
+		cmp        = servicex.DefaultDialNetworkPriority
 	)
 
 	return DialerParams{
 		Resolver: ResolverParams{
-			SchemeName:   &key,
+			SchemeName:   &schemeName,
 			DNSHostName:  nil,
-			AddressOrder: addrsort.CompareList{cmp},
+			AddressOrder: addrsort.Ordering{cmp},
 		},
 		GRPCDialOptions: nil,
 	}

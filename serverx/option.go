@@ -1,74 +1,24 @@
 package serverx
 
-import (
-	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/multi"
-)
+import "github.com/oligarch316/go-netx"
 
-type (
-	// Option TODO.
-	Option func(*Params) error
-
-	// ParamsService TODO.
-	ParamsService interface {
-		AddListeners(ServiceID, ...netx.Listener)
-		AddDependencies(ServiceID, ...ServiceID)
-	}
-
-	// Params TODO.
-	Params struct {
-		ParamsService
-
-		// TODO: Any other various top level server parameters (logging for example)
-	}
-)
-
-type serviceParam struct {
-	ml   *multi.Listener
-	deps map[ServiceID]struct{}
+// WithListeners TODO.
+func WithListeners(id netx.ServiceID, ls ...netx.Listener) Option {
+	return func(p *Params) { p.appendListeners(id, ls...) }
 }
 
-func (sp *serviceParam) addListeners(ls ...netx.Listener) {
-	if sp.ml == nil {
-		sp.ml = multi.NewListener(ls...)
-		return
-	}
-
-	sp.ml.Append(ls...)
+// WithDependencies TODO.
+func WithDependencies(id netx.ServiceID, deps ...netx.ServiceID) Option {
+	return func(p *Params) { p.appendDependencies(id, deps...) }
 }
 
-func (sp *serviceParam) addDependencies(depIDs ...ServiceID) {
-	if sp.deps == nil {
-		sp.deps = make(map[ServiceID]struct{})
+// WithIgnoreAll TODO.
+func WithIgnoreAll() Option {
+	return func(p *Params) {
+		p.IgnoreParams = IgnoreParams{
+			IgnoreMissingListeners:    true,
+			IgnoreDuplicateServices:   true,
+			IgnoreMissingDependencies: true,
+		}
 	}
-
-	for _, depID := range depIDs {
-		sp.deps[depID] = struct{}{}
-	}
-}
-
-type serviceParams map[ServiceID]*serviceParam
-
-func (sps serviceParams) AddListeners(id ServiceID, ls ...netx.Listener) {
-	sps.paramOrNew(id).addListeners(ls...)
-}
-
-func (sps serviceParams) AddDependencies(id ServiceID, depIDs ...ServiceID) {
-	sps.paramOrNew(id).addDependencies(depIDs...)
-}
-
-func (sps serviceParams) mlOk(id ServiceID) (*multi.Listener, bool) {
-	if param, ok := sps[id]; ok && param.ml != nil {
-		return param.ml, true
-	}
-	return nil, false
-}
-
-func (sps serviceParams) paramOrNew(id ServiceID) *serviceParam {
-	param, ok := sps[id]
-	if !ok {
-		param = new(serviceParam)
-		sps[id] = param
-	}
-	return param
 }
