@@ -4,16 +4,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/oligarch316/go-netx/servicex"
+	"github.com/oligarch316/go-netx"
 )
 
-type idList []servicex.ID
+type idList []netx.ServiceID
 
 func (il idList) Len() int           { return len(il) }
 func (il idList) Swap(i, j int)      { il[i], il[j] = il[j], il[i] }
 func (il idList) Less(i, j int) bool { return il[i].String() < il[j].String() }
 
-type cycleError []servicex.ID
+type cycleError []netx.ServiceID
 
 func (ce cycleError) complete() bool { return len(ce) > 1 && ce[0] == ce[len(ce)-1] }
 
@@ -32,11 +32,11 @@ func (ce cycleError) Error() string {
 
 func findDependencyCycles(params ServiceParams) error {
 	var (
-		visited = make(map[servicex.ID]bool)
-		recurse func(servicex.ID) cycleError
+		visited = make(map[netx.ServiceID]bool)
+		recurse func(netx.ServiceID) cycleError
 	)
 
-	recurse = func(svcID servicex.ID) cycleError {
+	recurse = func(svcID netx.ServiceID) cycleError {
 		if complete, exists := visited[svcID]; exists {
 			if complete {
 				return nil

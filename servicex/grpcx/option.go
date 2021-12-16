@@ -4,7 +4,6 @@ import (
 	"github.com/oligarch316/go-netx"
 	"github.com/oligarch316/go-netx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
-	"github.com/oligarch316/go-netx/servicex"
 	"google.golang.org/grpc"
 )
 
@@ -16,7 +15,7 @@ func WithListeners(ls ...netx.Listener) serverx.Option {
 }
 
 // WithDependencies TODO.
-func WithDependencies(deps ...servicex.ID) serverx.Option {
+func WithDependencies(deps ...netx.ServiceID) serverx.Option {
 	return serverx.WithDependencies(ID, deps...)
 }
 

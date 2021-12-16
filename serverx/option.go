@@ -1,17 +1,14 @@
 package serverx
 
-import (
-	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/servicex"
-)
+import "github.com/oligarch316/go-netx"
 
 // WithListeners TODO.
-func WithListeners(id servicex.ID, ls ...netx.Listener) Option {
+func WithListeners(id netx.ServiceID, ls ...netx.Listener) Option {
 	return func(p *Params) { p.appendListeners(id, ls...) }
 }
 
 // WithDependencies TODO.
-func WithDependencies(id servicex.ID, deps ...servicex.ID) Option {
+func WithDependencies(id netx.ServiceID, deps ...netx.ServiceID) Option {
 	return func(p *Params) { p.appendDependencies(id, deps...) }
 }
 

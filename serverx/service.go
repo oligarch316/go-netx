@@ -2,6 +2,7 @@ package serverx
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/oligarch316/go-netx"
 	"github.com/oligarch316/go-netx/multi"
@@ -9,9 +10,9 @@ import (
 	"github.com/oligarch316/go-netx/servicex"
 )
 
-type dependencySet map[servicex.ID]struct{}
+type dependencySet map[netx.ServiceID]struct{}
 
-func (ds dependencySet) Append(ids ...servicex.ID) {
+func (ds dependencySet) Append(ids ...netx.ServiceID) {
 	for _, id := range ids {
 		ds[id] = struct{}{}
 	}
@@ -24,14 +25,14 @@ type serviceParamData struct {
 
 // ServiceParams TODO.
 type ServiceParams struct {
-	services map[servicex.ID]*serviceParamData
+	services map[netx.ServiceID]*serviceParamData
 }
 
 func newServiceParams() ServiceParams {
-	return ServiceParams{services: make(map[servicex.ID]*serviceParamData)}
+	return ServiceParams{services: make(map[netx.ServiceID]*serviceParamData)}
 }
 
-func (sp *ServiceParams) requireData(id servicex.ID) *serviceParamData {
+func (sp *ServiceParams) requireData(id netx.ServiceID) *serviceParamData {
 	res, ok := sp.services[id]
 	if !ok {
 		res = &serviceParamData{
@@ -43,23 +44,33 @@ func (sp *ServiceParams) requireData(id servicex.ID) *serviceParamData {
 	return res
 }
 
-func (sp *ServiceParams) appendListeners(id servicex.ID, ls ...netx.Listener) {
+func (sp *ServiceParams) appendListeners(id netx.ServiceID, ls ...netx.Listener) {
 	sp.requireData(id).listener.Append(ls...)
 }
 
-func (sp *ServiceParams) appendDependencies(id servicex.ID, depIDs ...servicex.ID) {
+func (sp *ServiceParams) appendDependencies(id netx.ServiceID, depIDs ...netx.ServiceID) {
 	sp.requireData(id).deps.Append(depIDs...)
 }
 
+type waitGroup interface {
+	Done()
+	Wait()
+}
+
+type noopWaitGroup struct{}
+
+func (noopWaitGroup) Done() {}
+func (noopWaitGroup) Wait() {}
+
 type service struct {
-	svc servicex.Service
+	svc netx.Service
 	ml  *multi.Listener
 
 	dependants, requirements []*service
 	dependantDoneSignal      func()
 }
 
-func newService(svc servicex.Service, ml *multi.Listener) *service {
+func newService(svc netx.Service, ml *multi.Listener) *service {
 	return &service{svc: svc, ml: ml}
 }
 
@@ -75,52 +86,72 @@ func (s *service) DependOn(svc *service) {
 }
 
 func (s *service) Runners() []runner.Item {
+	var res []runner.Item
+
 	// ----- "Glue" runners
 	// > wait groups for synchronization purposes
 	var (
-		dependantsWG = runner.NewWaitGroup(len(s.dependants))
-		listenersWG  = runner.NewWaitGroup(s.ml.Len())
-		res          = []runner.Item{dependantsWG, listenersWG}
+		dependantsWG waitGroup = noopWaitGroup{}
+		listenersWG  waitGroup = noopWaitGroup{}
 	)
+
+	if len(s.dependants) > 0 {
+		rnr := runner.NewWaitGroup(len(s.dependants))
+		dependantsWG = rnr
+		res = append(res, newServerRunner(s.svc.ID(), "dependants wait group", rnr))
+	}
+
+	if s.ml.Len() > 0 {
+		rnr := runner.NewWaitGroup(s.ml.Len())
+		listenersWG = rnr
+		res = append(res, newServerRunner(s.svc.ID(), "listeners wait group", rnr))
+	}
 
 	s.dependantDoneSignal = dependantsWG.Done
 
 	// ----- Service runner
 	// > svc.Serve(...) and svc.Close(...) wrapped with glue logic
 	var (
-		baseServiceRunner = servicex.NewRunner(s.ml, s.svc)
+		baseServiceRunner    = servicex.NewRunner(s.ml, s.svc)
+		wrappedServiceRunner = runner.New(
+			// Run
+			func() error {
+				defer s.signalRequirements()
+				return baseServiceRunner.Run()
+			},
 
-		wrappedServiceRun = func() error {
-			defer s.signalRequirements()
-			return baseServiceRunner.Run()
-		}
-
-		wrappedServiceClose = func(ctx context.Context) error {
-			listenersWG.Wait()
-			return baseServiceRunner.Close(ctx)
-		}
+			// Close
+			func(ctx context.Context) error {
+				listenersWG.Wait()
+				return baseServiceRunner.Close(ctx)
+			},
+		)
 	)
 
-	res = append(res, runner.New(wrappedServiceRun, wrappedServiceClose))
+	res = append(res, newServerRunner(s.svc.ID(), "service", wrappedServiceRunner))
 
 	// ----- Listener runners
 	// > ml.Runners() wrapped with glue logic
 	for _, item := range s.ml.Runners() {
 		var (
-			baseRunner = item
+			baseListenRunner    = item
+			wrappedListenRunner = runner.New(
+				// Run
+				func() error {
+					defer listenersWG.Done()
+					return baseListenRunner.Run()
+				},
 
-			wrappedRun = func() error {
-				defer listenersWG.Done()
-				return baseRunner.Run()
-			}
-
-			wrappedClose = func(ctx context.Context) error {
-				dependantsWG.Wait()
-				return baseRunner.Close(ctx)
-			}
+				// Close
+				func(ctx context.Context) error {
+					dependantsWG.Wait()
+					return baseListenRunner.Close(ctx)
+				},
+			)
 		)
 
-		res = append(res, runner.New(wrappedRun, wrappedClose))
+		listenerName := fmt.Sprintf("listener (%s)", baseListenRunner.Addr())
+		res = append(res, newServerRunner(s.svc.ID(), listenerName, wrappedListenRunner))
 	}
 
 	return res

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/oligarch316/go-netx"
 	"github.com/oligarch316/go-netx/runner"
-	"github.com/oligarch316/go-netx/servicex"
 )
 
 var (
@@ -64,7 +64,7 @@ func (s *Server) Close(ctx context.Context) {
 }
 
 // DialSet TODO.
-func (s *Server) DialSet(id servicex.ID) (*DialSet, error) {
+func (s *Server) DialSet(id netx.ServiceID) (*DialSet, error) {
 	if svcParams, ok := s.params.services[id]; ok {
 		return &DialSet{svcParams.listener.Set}, nil
 	}
@@ -73,8 +73,8 @@ func (s *Server) DialSet(id servicex.ID) (*DialSet, error) {
 }
 
 // Serve TODO.
-func (s *Server) Serve(svcs ...servicex.Service) (<-chan error, error) {
-	svcMap := make(map[servicex.ID]*service)
+func (s *Server) Serve(svcs ...netx.Service) (<-chan error, error) {
+	svcMap := make(map[netx.ServiceID]*service)
 
 	// Combine arguments with associated params to build finalized services
 	for _, svc := range svcs {

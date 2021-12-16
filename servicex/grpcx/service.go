@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/oligarch316/go-netx/servicex"
+	"github.com/oligarch316/go-netx"
 	"google.golang.org/grpc"
 )
 
@@ -15,7 +15,7 @@ type namespace struct{}
 func (n namespace) String() string { return "grpcx" }
 
 // ID TODO.
-var ID servicex.ID = namespace{}
+var ID netx.ServiceID = namespace{}
 
 var errServiceClosed = errors.New("grpcx: service closed")
 
@@ -61,7 +61,7 @@ func NewService(opts ...ServiceOption) *Service {
 }
 
 // ID TODO.
-func (s Service) ID() servicex.ID { return ID }
+func (s Service) ID() netx.ServiceID { return ID }
 
 // Serve TODO.
 func (s *Service) Serve(l net.Listener) error {

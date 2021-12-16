@@ -22,7 +22,7 @@ type DialerParams struct {
 
 func defaultDialerParams() DialerParams {
 	var (
-		schemeName = servicex.DefaultDialKeyName
+		schemeName = servicex.DefaultDialKey
 		cmp        = servicex.DefaultDialNetworkPriority
 	)
 

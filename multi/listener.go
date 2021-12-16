@@ -93,9 +93,13 @@ func (mr *mergeRunner) Run() error {
 				continue
 			case <-mr.closeChan:
 				// Runner was closed
+
+				// TODO: Should this be a non-nil error indicating forced (non-happy-path) closure? Probably...
 				return nil
 			case <-mr.mergeL.closeChan:
 				// Target merge listener was closed
+
+				// TODO: Should this be a non-nil error indicating forced (non-happy-path) closure? Probably...
 				return nil
 			}
 		}

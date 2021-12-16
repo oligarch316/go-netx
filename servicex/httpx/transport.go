@@ -26,7 +26,7 @@ type TransportParams struct {
 
 func defaultTransportParams() TransportParams {
 	var (
-		schemeName = servicex.DefaultDialKeyName
+		schemeName = servicex.DefaultDialKey
 		cmp        = servicex.DefaultDialNetworkPriority
 	)
 
