@@ -1,9 +1,10 @@
-package netx
+package listenerx
 
 import (
 	"context"
 	"net"
 
+	"github.com/oligarch316/go-netx"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -22,7 +23,7 @@ func (internalAddr) String() string  { return InternalNetwork }
 type internalListener struct{ *bufconn.Listener }
 
 // NewInternal TODO.
-func NewInternal(size int) Listener {
+func NewInternal(size int) netx.Listener {
 	return &internalListener{Listener: bufconn.Listen(size)}
 }
 
