@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/oligarch316/go-netx/multi"
-	"github.com/oligarch316/go-netx/multi/addrsort"
+	"github.com/oligarch316/go-netx/listenerx/multi"
+	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 	"github.com/stretchr/testify/assert"
 )
 
