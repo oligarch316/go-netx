@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
+	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/serverx"
 	"github.com/oligarch316/go-netx/servicex"
 )
@@ -20,7 +20,7 @@ type TransportOption func(*TransportParams)
 // TransportParams TODO.
 type TransportParams struct {
 	HostName, SchemeName, SchemeTLSName *string
-	AddressOrder                        addrsort.Ordering
+	AddressOrder                        addressx.Ordering
 	HTTPTransportOptions                []func(*http.Transport)
 }
 
@@ -34,7 +34,7 @@ func defaultTransportParams() TransportParams {
 		HostName:             nil,
 		SchemeTLSName:        nil,
 		SchemeName:           &schemeName,
-		AddressOrder:         addrsort.Ordering{cmp},
+		AddressOrder:         addressx.Ordering{cmp},
 		HTTPTransportOptions: nil,
 	}
 }

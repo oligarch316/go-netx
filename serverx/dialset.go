@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sort"
 
+	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/listenerx/multi"
-	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 )
 
 var errUnknownDialFailure = errors.New("serverx: unknown dial failure")
@@ -67,13 +68,15 @@ func (ds DialSet) DialContext(ctx context.Context, hs ...multi.Hash) (net.Conn, 
 // Resolve TODO.
 // TODO: is returning []multi.Hash instead of []multi.Addr really the best idea
 // here. What about callers wanting to log/error with net.Addr info when issues occur?
-func (ds DialSet) Resolve(cmps ...addrsort.Comparer) []multi.Hash {
+func (ds DialSet) Resolve(cmps ...addressx.Comparer) []multi.Hash {
 	var (
-		addrs = ds.mSet.Addrs()
-		res   = make([]multi.Hash, len(addrs))
+		addrs    = ds.mSet.Addrs()
+		ordering = addressx.Ordering(cmps)
+		res      = make([]multi.Hash, len(addrs))
 	)
 
-	addrsort.Stable(addrs, cmps...)
+	// TODO: Annoyingly repetitive but should be removed wholesale in the next commit
+	sort.SliceStable(addrs, func(i, j int) bool { return ordering.Less(addrs[i], addrs[j]) })
 
 	for i, addr := range addrs {
 		res[i] = addr

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
+	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/serverx"
 	"github.com/oligarch316/go-netx/servicex"
 	"google.golang.org/grpc"
@@ -30,7 +30,7 @@ func defaultDialerParams() DialerParams {
 		Resolver: ResolverParams{
 			SchemeName:   &schemeName,
 			DNSHostName:  nil,
-			AddressOrder: addrsort.Ordering{cmp},
+			AddressOrder: addressx.Ordering{cmp},
 		},
 		GRPCDialOptions: nil,
 	}

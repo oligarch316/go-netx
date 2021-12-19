@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/listenerx/multi"
-	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
 )
 
@@ -47,7 +47,7 @@ type dialFactory struct {
 	set    *serverx.DialSet
 }
 
-func newDialFactory(set *serverx.DialSet, cmps []addrsort.Comparer) dialFactory {
+func newDialFactory(set *serverx.DialSet, cmps []addressx.Comparer) dialFactory {
 	return dialFactory{
 		hashes: set.Resolve(cmps...),
 		set:    set,

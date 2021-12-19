@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
+	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/serverx"
 )
 
@@ -86,6 +86,6 @@ func WithResolveHostName(name string) TransportOption {
 }
 
 // WithResolveAddressOrder TODO.
-func WithResolveAddressOrder(cmps ...addrsort.Comparer) TransportOption {
+func WithResolveAddressOrder(cmps ...addressx.Comparer) TransportOption {
 	return func(p *TransportParams) { p.AddressOrder = cmps }
 }

@@ -1,11 +1,11 @@
-package addrsort_test
+package addressx_test
 
 import (
 	"fmt"
+	"net"
 	"testing"
 
-	"github.com/oligarch316/go-netx/listenerx/multi"
-	"github.com/oligarch316/go-netx/listenerx/multi/addrsort"
+	"github.com/oligarch316/go-netx/addressx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,13 +15,13 @@ func (ta testAddr) Network() string { return ta.network }
 
 func (ta testAddr) String() string { return ta.address }
 
-func addr(network, address string) multi.Addr {
-	return multi.Addr{Addr: testAddr{network: network, address: address}}
-}
+// func testAddr{network, address string) net.Addr {
+// 	return net.Addr{Addr: testAddr{network: network, address: address}}
+// }
 
 func TestAddrCompare(t *testing.T) {
 	type (
-		input       struct{ x, y multi.Addr }
+		input       struct{ x, y net.Addr }
 		expectation func(*testing.T, bool, bool, string) bool
 		testData    struct {
 			name   string
@@ -44,7 +44,7 @@ func TestAddrCompare(t *testing.T) {
 		}
 	)
 
-	run := func(t *testing.T, cpr addrsort.Comparer, expect expectation, inputs []input) {
+	run := func(t *testing.T, cpr addressx.Comparer, expect expectation, inputs []input) {
 		for _, input := range inputs {
 			info := fmt.Sprintf(
 				"%s|%s, %s|%s",
@@ -59,28 +59,28 @@ func TestAddrCompare(t *testing.T) {
 
 	t.Run("lexographic", func(t *testing.T) {
 		t.Run("address", func(t *testing.T) {
-			cpr := addrsort.ByLexAddress
+			cpr := addressx.ByLexAddress
 
 			subtests := []testData{
 				{
 					name:   "is less",
 					expect: isLess,
 					inputs: []input{
-						{x: addr("nB", "a1"), y: addr("nA", "a2")},
+						{x: testAddr{"nB", "a1"}, y: testAddr{"nA", "a2"}},
 					},
 				},
 				{
 					name:   "not less",
 					expect: notLess,
 					inputs: []input{
-						{x: addr("nA", "a2"), y: addr("nB", "a1")},
+						{x: testAddr{"nA", "a2"}, y: testAddr{"nB", "a1"}},
 					},
 				},
 				{
 					name:   "are equal",
 					expect: areEqual,
 					inputs: []input{
-						{x: addr("nA", "a1"), y: addr("nB", "a1")},
+						{x: testAddr{"nA", "a1"}, y: testAddr{"nB", "a1"}},
 					},
 				},
 			}
@@ -92,28 +92,28 @@ func TestAddrCompare(t *testing.T) {
 		})
 
 		t.Run("network", func(t *testing.T) {
-			cpr := addrsort.ByLexNetwork
+			cpr := addressx.ByLexNetwork
 
 			subtests := []testData{
 				{
 					name:   "is less",
 					expect: isLess,
 					inputs: []input{
-						{x: addr("nA", "a2"), y: addr("nB", "a1")},
+						{x: testAddr{"nA", "a2"}, y: testAddr{"nB", "a1"}},
 					},
 				},
 				{
 					name:   "not less",
 					expect: notLess,
 					inputs: []input{
-						{x: addr("nB", "a1"), y: addr("nA", "a2")},
+						{x: testAddr{"nB", "a1"}, y: testAddr{"nA", "a2"}},
 					},
 				},
 				{
 					name:   "are equal",
 					expect: areEqual,
 					inputs: []input{
-						{x: addr("nA", "a1"), y: addr("nA", "a2")},
+						{x: testAddr{"nA", "a1"}, y: testAddr{"nA", "a2"}},
 					},
 				},
 			}
@@ -127,7 +127,7 @@ func TestAddrCompare(t *testing.T) {
 
 	t.Run("priority", func(t *testing.T) {
 		t.Run("address", func(t *testing.T) {
-			cpr := addrsort.ByPriorityAddress("a4", "a3", "a2")
+			cpr := addressx.ByPriorityAddress("a4", "a3", "a2")
 
 			subtests := []testData{
 				{
@@ -135,10 +135,10 @@ func TestAddrCompare(t *testing.T) {
 					expect: isLess,
 					inputs: []input{
 						// Both have priority value
-						{x: addr("nB", "a4"), y: addr("nA", "a3")},
+						{x: testAddr{"nB", "a4"}, y: testAddr{"nA", "a3"}},
 
 						// One has priority value
-						{x: addr("nB", "a2"), y: addr("nA", "a1")},
+						{x: testAddr{"nB", "a2"}, y: testAddr{"nA", "a1"}},
 					},
 				},
 				{
@@ -146,10 +146,10 @@ func TestAddrCompare(t *testing.T) {
 					expect: notLess,
 					inputs: []input{
 						// Both have priority value
-						{x: addr("nA", "a3"), y: addr("nB", "a4")},
+						{x: testAddr{"nA", "a3"}, y: testAddr{"nB", "a4"}},
 
 						// One has priority value
-						{x: addr("nA", "a1"), y: addr("nB", "a2")},
+						{x: testAddr{"nA", "a1"}, y: testAddr{"nB", "a2"}},
 					},
 				},
 				{
@@ -157,10 +157,10 @@ func TestAddrCompare(t *testing.T) {
 					expect: areEqual,
 					inputs: []input{
 						// Both have priority value
-						{x: addr("nA", "a4"), y: addr("nB", "a4")},
+						{x: testAddr{"nA", "a4"}, y: testAddr{"nB", "a4"}},
 
 						// Neither has priority value
-						{x: addr("nA", "a10"), y: addr("nB", "a11")},
+						{x: testAddr{"nA", "a10"}, y: testAddr{"nB", "a11"}},
 					},
 				},
 			}
@@ -172,7 +172,7 @@ func TestAddrCompare(t *testing.T) {
 		})
 
 		t.Run("network", func(t *testing.T) {
-			cpr := addrsort.ByPriorityNetwork("nD", "nC", "nB")
+			cpr := addressx.ByPriorityNetwork("nD", "nC", "nB")
 
 			subtests := []testData{
 				{
@@ -180,10 +180,10 @@ func TestAddrCompare(t *testing.T) {
 					expect: isLess,
 					inputs: []input{
 						// Both have priority value
-						{x: addr("nD", "a2"), y: addr("nC", "a1")},
+						{x: testAddr{"nD", "a2"}, y: testAddr{"nC", "a1"}},
 
 						// One has priority value
-						{x: addr("nB", "a2"), y: addr("nA", "a1")},
+						{x: testAddr{"nB", "a2"}, y: testAddr{"nA", "a1"}},
 					},
 				},
 				{
@@ -191,10 +191,10 @@ func TestAddrCompare(t *testing.T) {
 					expect: notLess,
 					inputs: []input{
 						// Both have priority value
-						{x: addr("nC", "a1"), y: addr("nD", "a2")},
+						{x: testAddr{"nC", "a1"}, y: testAddr{"nD", "a2"}},
 
 						// One has priority value
-						{x: addr("nA", "a1"), y: addr("nB", "a2")},
+						{x: testAddr{"nA", "a1"}, y: testAddr{"nB", "a2"}},
 					},
 				},
 				{
@@ -202,10 +202,10 @@ func TestAddrCompare(t *testing.T) {
 					expect: areEqual,
 					inputs: []input{
 						// Both have priority value
-						{x: addr("nD", "a1"), y: addr("nD", "a2")},
+						{x: testAddr{"nD", "a1"}, y: testAddr{"nD", "a2"}},
 
 						// Neither has priority value
-						{x: addr("nX", "a1"), y: addr("nY", "a2")},
+						{x: testAddr{"nX", "a1"}, y: testAddr{"nY", "a2"}},
 					},
 				},
 			}
