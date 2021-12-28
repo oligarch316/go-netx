@@ -28,7 +28,7 @@ func (l *Listener) Runners() []*mergeRunner {
 	res := make([]*mergeRunner, l.Len())
 
 	for i, item := range l.listeners {
-		res[i] = l.runner(item)
+		res[i] = newMergeRunner(item, l.mergeListenerChannels)
 	}
 
 	return res

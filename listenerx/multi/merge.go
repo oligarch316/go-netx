@@ -20,52 +20,57 @@ type mergeAddr struct{}
 func (mergeAddr) Network() string { return mergeAddrNetwork }
 func (mergeAddr) String() string  { return mergeAddrNetwork }
 
+type mergeListenerChannels struct {
+	conn  chan net.Conn
+	close chan struct{}
+}
+
 type mergeListener struct {
-	connChan  chan net.Conn
-	closeChan chan struct{}
+	mergeListenerChannels
 	closeOnce sync.Once
 }
 
 func newMergeListener() mergeListener {
-	return mergeListener{
-		connChan:  make(chan net.Conn),
-		closeChan: make(chan struct{}),
+	channels := mergeListenerChannels{
+		conn:  make(chan net.Conn),
+		close: make(chan struct{}),
 	}
+
+	return mergeListener{mergeListenerChannels: channels}
 }
 
 func (*mergeListener) Addr() net.Addr { return mergeAddr{} }
 
 func (ml *mergeListener) Accept() (net.Conn, error) {
 	select {
-	case conn := <-ml.connChan:
+	case conn := <-ml.conn:
 		return conn, nil
-	case <-ml.closeChan:
+	case <-ml.close:
 		// TODO: Change to net.ErrClosed for compatible go versions
 		return nil, errMergeListenerClosed
 	}
 }
 
 func (ml *mergeListener) Close() error {
-	ml.closeOnce.Do(func() { close(ml.closeChan) })
+	ml.closeOnce.Do(func() { close(ml.close) })
 	return nil
 }
 
-func (ml *mergeListener) runner(l net.Listener) *mergeRunner {
-	return &mergeRunner{
-		l:      l,
-		mergeL: ml,
+type mergeRunner struct {
+	l net.Listener
 
-		doneChan:  make(chan struct{}),
-		closeChan: make(chan struct{}),
-	}
+	mlChannels mergeListenerChannels
+	doneChan   chan struct{}
+	closeChan  chan struct{}
 }
 
-type mergeRunner struct {
-	l      net.Listener
-	mergeL *mergeListener
-
-	doneChan  chan struct{}
-	closeChan chan struct{}
+func newMergeRunner(l net.Listener, mlChannels mergeListenerChannels) *mergeRunner {
+	return &mergeRunner{
+		l:          l,
+		mlChannels: mlChannels,
+		doneChan:   make(chan struct{}),
+		closeChan:  make(chan struct{}),
+	}
 }
 
 func (mr mergeRunner) Addr() net.Addr { return mr.l.Addr() }
@@ -96,7 +101,7 @@ func (mr *mergeRunner) Run() error {
 
 				// TODO: Should this be a non-nil error indicating forced (non-happy-path) closure? Probably...
 				return nil
-			case <-mr.mergeL.closeChan:
+			case <-mr.mlChannels.close:
 				// Target merge listener was closed
 
 				// TODO: Should this be a non-nil error indicating forced (non-happy-path) closure? Probably...
@@ -107,7 +112,7 @@ func (mr *mergeRunner) Run() error {
 		delay.Reset()
 
 		select {
-		case mr.mergeL.connChan <- conn:
+		case mr.mlChannels.conn <- conn:
 			// Connection was successfully handed off, continue
 		case <-mr.closeChan:
 			// Runner was closed
@@ -115,7 +120,7 @@ func (mr *mergeRunner) Run() error {
 				// TODO: Log/track/surface this somehow
 			}
 			return fmt.Errorf("unprocessed connection: %w", errMergeRunnerClosed)
-		case <-mr.mergeL.closeChan:
+		case <-mr.mlChannels.close:
 			// Target merge listener was closed
 			if err := conn.Close(); err != nil {
 				// TODO: Log/track/surface this somehow
