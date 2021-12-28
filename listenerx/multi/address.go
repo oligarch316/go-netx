@@ -14,7 +14,7 @@ type Addr struct {
 
 // Hash TODO.
 type Hash interface {
-	Format() string
+	HashString() string
 
 	id() uint32
 	idx() uint32
@@ -33,7 +33,7 @@ type hash uint64
 
 func newHash(setID, setIdx uint32) hash { return hash(uint64(setID)<<32 | uint64(setIdx)) }
 
-func (h hash) Format() string { return strconv.FormatUint(uint64(h), 10) }
+func (h hash) HashString() string { return strconv.FormatUint(uint64(h), 10) }
 
 func (h hash) id() uint32 { return uint32(h >> 32) }
 
