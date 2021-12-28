@@ -46,8 +46,7 @@ func (ml *mergeListener) Accept() (net.Conn, error) {
 	case conn := <-ml.conn:
 		return conn, nil
 	case <-ml.close:
-		// TODO: Change to net.ErrClosed for compatible go versions
-		return nil, errMergeListenerClosed
+		return nil, net.ErrClosed
 	}
 }
 
