@@ -8,18 +8,17 @@ import (
 	"sync"
 )
 
-// NetworkName TODO.
-const NetworkName = "multi"
-
 var (
 	errMergeListenerClosed = errors.New("multi: listener closed")
 	errMergeRunnerClosed   = errors.New("multi: runner closed")
 )
 
+const mergeAddrNetwork = "multi"
+
 type mergeAddr struct{}
 
-func (mergeAddr) Network() string { return NetworkName }
-func (mergeAddr) String() string  { return NetworkName }
+func (mergeAddr) Network() string { return mergeAddrNetwork }
+func (mergeAddr) String() string  { return mergeAddrNetwork }
 
 type mergeListener struct {
 	connChan  chan net.Conn
