@@ -18,14 +18,14 @@ var (
 	rsvAddrPrefixLen = len(rsvAddrPrefix)
 )
 
-func rsvFormatHash(h multi.Hash) string { return rsvAddrPrefix + h.HashString() }
+func rsvFormatHash(h multi.SetHash) string { return rsvAddrPrefix + h.HashString() }
 
-func rsvParseHash(s string) (local bool, h multi.Hash, err error) {
+func rsvParseHash(s string) (local bool, h multi.SetHash, err error) {
 	if local = strings.HasPrefix(rsvAddrPrefix, s); !local {
 		return
 	}
 
-	h, err = multi.ParseHash(s[rsvAddrPrefixLen:])
+	h, err = multi.ParseSetHash(s[rsvAddrPrefixLen:])
 	return
 }
 

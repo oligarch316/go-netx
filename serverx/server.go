@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/listenerx/multi"
 	"github.com/oligarch316/go-netx/runner"
 )
 
@@ -63,10 +64,10 @@ func (s *Server) Close(ctx context.Context) {
 	}
 }
 
-// DialSet TODO.
-func (s *Server) DialSet(id netx.ServiceID) (*DialSet, error) {
+// Dialer TODO.
+func (s *Server) Dialer(id netx.ServiceID) (*multi.Dialer, error) {
 	if svcParams, ok := s.params.services[id]; ok {
-		return &DialSet{svcParams.listener.Set}, nil
+		return svcParams.listener.Dialer, nil
 	}
 
 	return nil, fmt.Errorf("%w: %s", errNoSuchService, id)

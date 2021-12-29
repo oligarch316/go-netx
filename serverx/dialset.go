@@ -1,86 +1,88 @@
 package serverx
 
-import (
-	"context"
-	"errors"
-	"net"
-	"sort"
+// TODO: Remove me
 
-	"github.com/oligarch316/go-netx/addressx"
-	"github.com/oligarch316/go-netx/listenerx/multi"
-)
+// import (
+// 	"context"
+// 	"errors"
+// 	"net"
+// 	"sort"
 
-var errUnknownDialFailure = errors.New("serverx: unknown dial failure")
+// 	"github.com/oligarch316/go-netx/addressx"
+// 	"github.com/oligarch316/go-netx/listenerx/multi"
+// )
 
-// DialSet TODO.
-type DialSet struct{ mSet multi.Set }
+// var errUnknownDialFailure = errors.New("serverx: unknown dial failure")
 
-// Len TODO.
-func (ds DialSet) Len() int { return ds.mSet.Len() }
+// // DialSet TODO.
+// type DialSet struct{ mSet multi.Set }
 
-// Dial TODO.
-func (ds DialSet) Dial(hs ...multi.Hash) (net.Conn, error) {
-	var firstErr error
+// // Len TODO.
+// func (ds DialSet) Len() int { return ds.mSet.Len() }
 
-	for _, h := range hs {
-		res, err := ds.mSet.Dial(h)
-		switch {
-		case err == nil:
-			return res, nil
-		case firstErr == nil:
-			firstErr = err
-		}
-	}
+// // Dial TODO.
+// func (ds DialSet) Dial(hs ...multi.Hash) (net.Conn, error) {
+// 	var firstErr error
 
-	if firstErr == nil {
-		return nil, errUnknownDialFailure
-	}
+// 	for _, h := range hs {
+// 		res, err := ds.mSet.Dial(h)
+// 		switch {
+// 		case err == nil:
+// 			return res, nil
+// 		case firstErr == nil:
+// 			firstErr = err
+// 		}
+// 	}
 
-	return nil, firstErr
-}
+// 	if firstErr == nil {
+// 		return nil, errUnknownDialFailure
+// 	}
 
-// DialContext TODO.
-func (ds DialSet) DialContext(ctx context.Context, hs ...multi.Hash) (net.Conn, error) {
-	var firstErr error
+// 	return nil, firstErr
+// }
 
-	for _, h := range hs {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			res, err := ds.mSet.DialContext(ctx, h)
-			switch {
-			case err == nil:
-				return res, nil
-			case firstErr == nil:
-				firstErr = err
-			}
-		}
-	}
+// // DialContext TODO.
+// func (ds DialSet) DialContext(ctx context.Context, hs ...multi.Hash) (net.Conn, error) {
+// 	var firstErr error
 
-	if firstErr == nil {
-		return nil, errUnknownDialFailure
-	}
+// 	for _, h := range hs {
+// 		select {
+// 		case <-ctx.Done():
+// 			return nil, ctx.Err()
+// 		default:
+// 			res, err := ds.mSet.DialContext(ctx, h)
+// 			switch {
+// 			case err == nil:
+// 				return res, nil
+// 			case firstErr == nil:
+// 				firstErr = err
+// 			}
+// 		}
+// 	}
 
-	return nil, firstErr
-}
+// 	if firstErr == nil {
+// 		return nil, errUnknownDialFailure
+// 	}
 
-// Resolve TODO.
-// TODO: is returning []multi.Hash instead of []multi.Addr really the best idea
-// here. What about callers wanting to log/error with net.Addr info when issues occur?
-func (ds DialSet) Resolve(cmps ...addressx.Comparer) []multi.Hash {
-	var (
-		addrs    = ds.mSet.Addrs()
-		ordering = addressx.Ordering(cmps)
-		res      = make([]multi.Hash, len(addrs))
-	)
+// 	return nil, firstErr
+// }
 
-	// TODO: Annoyingly repetitive but should be removed wholesale in the next commit
-	sort.SliceStable(addrs, func(i, j int) bool { return ordering.Less(addrs[i], addrs[j]) })
+// // Resolve TODO.
+// // TODO: is returning []multi.Hash instead of []multi.Addr really the best idea
+// // here. What about callers wanting to log/error with net.Addr info when issues occur?
+// func (ds DialSet) Resolve(cmps ...addressx.Comparer) []multi.Hash {
+// 	var (
+// 		addrs    = ds.mSet.Addrs()
+// 		ordering = addressx.Ordering(cmps)
+// 		res      = make([]multi.Hash, len(addrs))
+// 	)
 
-	for i, addr := range addrs {
-		res[i] = addr
-	}
+// 	// TODO: Annoyingly repetitive but should be removed wholesale in the next commit
+// 	sort.SliceStable(addrs, func(i, j int) bool { return ordering.Less(addrs[i], addrs[j]) })
 
-	return res
-}
+// 	for i, addr := range addrs {
+// 		res[i] = addr
+// 	}
+
+// 	return res
+// }

@@ -8,24 +8,27 @@ import (
 
 // Listener TODO.
 type Listener struct {
+	*Dialer
 	mergeListener
-	Set
 }
 
 // NewListener TODO.
 func NewListener(ls ...netx.Listener) *Listener {
 	res := &Listener{
+		Dialer:        &Dialer{dialSet: newDialSet()},
 		mergeListener: newMergeListener(),
-		Set:           newSet(),
 	}
 
 	res.Append(ls...)
 	return res
 }
 
+// Append TODO.
+func (l *Listener) Append(ls ...netx.Listener) { l.listeners = append(l.listeners, ls...) }
+
 // Runners TODO.
 func (l *Listener) Runners() []*mergeRunner {
-	res := make([]*mergeRunner, l.Len())
+	res := make([]*mergeRunner, len(l.listeners))
 
 	for i, item := range l.listeners {
 		res[i] = newMergeRunner(item, l.mergeListenerChannels)
@@ -34,6 +37,4 @@ func (l *Listener) Runners() []*mergeRunner {
 	return res
 }
 
-func (l *Listener) String() string {
-	return fmt.Sprintf("multi listener %d", l.ID())
-}
+func (l *Listener) String() string { return fmt.Sprintf("multi listener %d", l.id) }
