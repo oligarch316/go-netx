@@ -2,7 +2,6 @@ package grpcx
 
 import (
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/serverx"
 	"google.golang.org/grpc"
 )
@@ -61,9 +60,4 @@ func WithResolveSchemeName(name string) DialerOption {
 // WithResolveDNSHostName TODO.
 func WithResolveDNSHostName(name string) DialerOption {
 	return func(p *DialerParams) { p.Resolver.DNSHostName = &name }
-}
-
-// WithResolveAddressOrder TODO.
-func WithResolveAddressOrder(cmps ...addressx.Comparer) DialerOption {
-	return func(p *DialerParams) { p.Resolver.AddressOrder = cmps }
 }

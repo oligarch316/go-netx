@@ -48,24 +48,3 @@ func wrapDialContext(dialer netx.Dialer, f dialContextFunc) dialContextFunc {
 		return f(ctx, network, addr)
 	}
 }
-
-// type dialFactory struct {
-// 	hashes []multi.Hash
-// 	set    *serverx.DialSet
-// }
-
-// func newDialFactory(set *serverx.DialSet, cmps []addressx.Comparer) dialFactory {
-// 	return dialFactory{
-// 		hashes: set.Resolve(cmps...),
-// 		set:    set,
-// 	}
-// }
-
-// func (df dialFactory) wrap(f dialContextFunc) dialContextFunc {
-// 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-// 		if addr == dialLocalHostKey {
-// 			return df.set.DialContext(ctx, df.hashes...)
-// 		}
-// 		return f(ctx, network, addr)
-// 	}
-// }

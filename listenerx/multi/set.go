@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	gDialSetID uint32
+	gSetID uint32
 
 	errInvalidSetHash = errors.New("invalid set hash")
 )
@@ -52,7 +52,7 @@ type dialSet struct {
 	listeners []netx.Listener
 }
 
-func newDialSet() dialSet { return dialSet{id: atomic.AddUint32(&gDialSetID, 1)} }
+func newDialSet() dialSet { return dialSet{id: atomic.AddUint32(&gSetID, 1)} }
 
 func (ds dialSet) lookup(hash SetHash) (netx.Listener, error) {
 	hID, hIdx := hash.id(), hash.idx()
@@ -67,7 +67,7 @@ func (ds dialSet) lookup(hash SetHash) (netx.Listener, error) {
 	return ds.listeners[hIdx], nil
 }
 
-func (ds dialSet) SetAddrs() []SetAddr {
+func (ds dialSet) Addrs() []SetAddr {
 	res := make([]SetAddr, 0, len(ds.listeners))
 
 	for i, l := range ds.listeners {
@@ -80,7 +80,7 @@ func (ds dialSet) SetAddrs() []SetAddr {
 	return res
 }
 
-func (ds dialSet) DialHash(hash SetHash) (net.Conn, error) {
+func (ds dialSet) Dial(hash SetHash) (net.Conn, error) {
 	l, err := ds.lookup(hash)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (ds dialSet) DialHash(hash SetHash) (net.Conn, error) {
 	return l.Dial()
 }
 
-func (ds dialSet) DialContextHash(ctx context.Context, hash SetHash) (net.Conn, error) {
+func (ds dialSet) DialContext(ctx context.Context, hash SetHash) (net.Conn, error) {
 	l, err := ds.lookup(hash)
 	if err != nil {
 		return nil, err

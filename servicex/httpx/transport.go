@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/addressx"
 	"github.com/oligarch316/go-netx/serverx"
 	"github.com/oligarch316/go-netx/servicex"
 )
@@ -21,21 +20,16 @@ type TransportOption func(*TransportParams)
 // TransportParams TODO.
 type TransportParams struct {
 	HostName, SchemeName, SchemeTLSName *string
-	AddressOrder                        addressx.Ordering
 	HTTPTransportOptions                []func(*http.Transport)
 }
 
 func defaultTransportParams() TransportParams {
-	var (
-		schemeName = servicex.DefaultDialKey
-		cmp        = servicex.DefaultDialNetworkPriority
-	)
+	schemeName := servicex.DefaultDialKey
 
 	return TransportParams{
 		HostName:             nil,
 		SchemeTLSName:        nil,
 		SchemeName:           &schemeName,
-		AddressOrder:         addressx.Ordering{cmp},
 		HTTPTransportOptions: nil,
 	}
 }
