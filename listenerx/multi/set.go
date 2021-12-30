@@ -31,6 +31,7 @@ type SetHash interface {
 	idx() uint32
 }
 
+// ParseSetHash TODO.
 func ParseSetHash(s string) (SetHash, error) {
 	val, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {

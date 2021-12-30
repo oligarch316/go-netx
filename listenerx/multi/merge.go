@@ -82,13 +82,17 @@ func (mr *mergeRunner) Run() error {
 	for {
 		conn, err := mr.l.Accept()
 		if err != nil {
-			ne, ok := err.(net.Error)
-			if !ok || !ne.Temporary() {
-				// TODO: What do we expect as a result of mr.l.Close()?
-				// Can we replace that expected error with nil here?
+			if errors.Is(err, net.ErrClosed) {
+				// Expected close error (happy path) => return nil
+				return nil
+			}
+
+			if ne, ok := err.(net.Error); !ok || !ne.Temporary() {
+				// Not nil, closed or temporary error => return err
 				return err
 			}
 
+			// Temporary error => delay and retry
 			// TODO: Log/track/surface this somehow
 
 			select {
@@ -97,14 +101,10 @@ func (mr *mergeRunner) Run() error {
 				continue
 			case <-mr.closeChan:
 				// Runner was closed
-
-				// TODO: Should this be a non-nil error indicating forced (non-happy-path) closure? Probably...
-				return nil
+				return fmt.Errorf("interrupted retry: %w", errMergeRunnerClosed)
 			case <-mr.mlChannels.close:
 				// Target merge listener was closed
-
-				// TODO: Should this be a non-nil error indicating forced (non-happy-path) closure? Probably...
-				return nil
+				return fmt.Errorf("interrupted retry: %w", errMergeListenerClosed)
 			}
 		}
 
