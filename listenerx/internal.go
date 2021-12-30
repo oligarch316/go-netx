@@ -1,7 +1,6 @@
 package listenerx
 
 import (
-	"context"
 	"net"
 
 	"github.com/oligarch316/go-netx"
@@ -29,8 +28,10 @@ func NewInternal(size int) netx.Listener {
 
 func (internalListener) Addr() net.Addr { return internalAddr{} }
 
-func (li internalListener) DialContext(_ context.Context) (net.Conn, error) {
-	// TODO: Ignoring context here is unmannerly, will be finicky to implement correctly though
-
-	return li.Dial()
+func (ia *internalListener) Accept() (net.Conn, error) {
+	conn, err := ia.Listener.Accept()
+	if err != nil && err.Error() == "closed" {
+		err = net.ErrClosed
+	}
+	return conn, err
 }
