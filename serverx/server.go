@@ -75,16 +75,19 @@ func (sp ServiceParams) lookup(id netx.ServiceID) *serviceParam {
 	return res
 }
 
+// AppendListeners TODO.
 func (sp ServiceParams) AppendListeners(id netx.ServiceID, ls ...netx.Listener) {
 	param := sp.lookup(id)
 	param.listeners = append(param.listeners, ls...)
 }
 
+// AppendListenerOpts TODO.
 func (sp ServiceParams) AppendListenerOpts(id netx.ServiceID, opts ...multi.ListenerOption) {
 	param := sp.lookup(id)
 	param.listenerOpts = append(param.listenerOpts, opts...)
 }
 
+// AppendDependencies TODO.
 func (sp ServiceParams) AppendDependencies(id netx.ServiceID, depIDs ...netx.ServiceID) {
 	param := sp.lookup(id)
 	for _, id := range depIDs {

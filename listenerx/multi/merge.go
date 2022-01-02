@@ -81,8 +81,10 @@ func newMergeRunner(params RunnerParams, source net.Listener, sink *mergeListene
 
 func (mr *MergeRunner) sendEvent(re RunnerEvent) { mr.params.EventHandler(re) }
 
+// Addr TODO.
 func (mr MergeRunner) Addr() net.Addr { return mr.source.Addr() }
 
+// Run TODO.
 func (mr *MergeRunner) Run() error {
 	defer close(mr.doneChan)
 
@@ -147,6 +149,7 @@ func (mr *MergeRunner) Run() error {
 	}
 }
 
+// Close TODO.
 func (mr *MergeRunner) Close(ctx context.Context) error {
 	if err := mr.source.Close(); err != nil {
 		mr.sendEvent(RunnerEventListenerCloseError{

@@ -8,10 +8,12 @@ import (
 // DelayFunc TODO.
 type DelayFunc func(attempt int) (delay time.Duration)
 
+// DelayFuncConstant TODO.
 func DelayFuncConstant(duration time.Duration) DelayFunc {
 	return func(int) time.Duration { return duration }
 }
 
+// DelayFuncMultiplicative TODO.
 func DelayFuncMultiplicative(min, max time.Duration, factor float64) DelayFunc {
 	maxF := float64(max)
 
@@ -21,6 +23,7 @@ func DelayFuncMultiplicative(min, max time.Duration, factor float64) DelayFunc {
 	}
 }
 
+// DelayFuncExponential TODO.
 func DelayFuncExponential(min, max time.Duration, factor float64) DelayFunc {
 	maxF := float64(max)
 
