@@ -2,8 +2,10 @@ package multi
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/listenerx/retry"
 )
 
 // ListenerOption TODO.
@@ -17,7 +19,13 @@ type ListenerParams struct {
 
 func defaultListenerParams() ListenerParams {
 	return ListenerParams{
-		// TODO
+		DialerParams: DialerParams{
+			// TODO
+		},
+		RunnerParams: RunnerParams{
+			AcceptRetryDelay: retry.DelayFuncExponential(5*time.Millisecond, 1*time.Second, 2),
+			EventHandler:     func(RunnerEvent) {},
+		},
 	}
 }
 

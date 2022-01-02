@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
+
+	"github.com/oligarch316/go-netx/listenerx/retry"
 )
 
 var (
-	errMergeListenerClosed = errors.New("multi: listener closed")
-	errMergeRunnerClosed   = errors.New("multi: runner closed")
+	errMergeListenerClosed = errors.New("source listener closed")
+	errMergeRunnerClosed   = errors.New("runner closed")
 )
 
 const mergeAddrNetwork = "multi"
@@ -51,11 +54,14 @@ func (ml *mergeListener) Close() error {
 
 // RunnerParams TODO.
 type RunnerParams struct {
-	// TODO
+	AcceptRetryDelay retry.DelayFunc
+	EventHandler     RunnerEventHandler
 }
 
 // MergeRunner TODO.
 type MergeRunner struct {
+	params RunnerParams
+
 	source net.Listener
 	sink   *mergeListener
 
@@ -65,6 +71,7 @@ type MergeRunner struct {
 
 func newMergeRunner(params RunnerParams, source net.Listener, sink *mergeListener) *MergeRunner {
 	return &MergeRunner{
+		params:    params,
 		source:    source,
 		sink:      sink,
 		doneChan:  make(chan struct{}),
@@ -72,12 +79,14 @@ func newMergeRunner(params RunnerParams, source net.Listener, sink *mergeListene
 	}
 }
 
+func (mr *MergeRunner) sendEvent(re RunnerEvent) { mr.params.EventHandler(re) }
+
 func (mr MergeRunner) Addr() net.Addr { return mr.source.Addr() }
 
 func (mr *MergeRunner) Run() error {
 	defer close(mr.doneChan)
 
-	delay := newRetryDelay()
+	delay := retry.NewDelay(mr.params.AcceptRetryDelay)
 
 	for {
 		conn, err := mr.source.Accept()
@@ -93,10 +102,15 @@ func (mr *MergeRunner) Run() error {
 			}
 
 			// Temporary error => delay and retry
-			// TODO: Log/track/surface this somehow
+			attempt, delayDuration := delay.Next()
+			mr.sendEvent(RunnerEventTemporaryAcceptError{
+				runnerEvent:        runnerEvent{addr: mr.Addr(), err: err},
+				Attempt:            attempt,
+				RetryDelayDuration: delayDuration,
+			})
 
 			select {
-			case <-delay.Sleep():
+			case <-time.After(delayDuration):
 				// Retry delay has elapsed, continue
 				continue
 			case <-mr.closeChan:
@@ -116,13 +130,17 @@ func (mr *MergeRunner) Run() error {
 		case <-mr.closeChan:
 			// Runner was closed
 			if err := conn.Close(); err != nil {
-				// TODO: Log/track/surface this somehow
+				mr.sendEvent(RunnerEventUnprocessedConnectionCloseError{
+					runnerEvent: runnerEvent{addr: mr.Addr(), err: err},
+				})
 			}
 			return fmt.Errorf("unprocessed connection: %w", errMergeRunnerClosed)
 		case <-mr.sink.closeChan:
 			// Target merge listener was closed
 			if err := conn.Close(); err != nil {
-				// TODO: Log/track/surface this somehow
+				mr.sendEvent(RunnerEventUnprocessedConnectionCloseError{
+					runnerEvent: runnerEvent{addr: mr.Addr(), err: err},
+				})
 			}
 			return fmt.Errorf("unprocessed connection: %w", errMergeListenerClosed)
 		}
@@ -131,7 +149,10 @@ func (mr *MergeRunner) Run() error {
 
 func (mr *MergeRunner) Close(ctx context.Context) error {
 	if err := mr.source.Close(); err != nil {
-		// TODO: Log/track/surface this somehow
+		mr.sendEvent(RunnerEventListenerCloseError{
+			runnerEvent: runnerEvent{addr: mr.Addr(), err: err},
+		})
+
 		close(mr.closeChan)
 		return nil
 	}
@@ -139,7 +160,10 @@ func (mr *MergeRunner) Close(ctx context.Context) error {
 	select {
 	case <-mr.doneChan:
 	case <-ctx.Done():
-		// TODO: Log/track/surface this somehow
+		mr.sendEvent(RunnerEventCloseContextExpiredError{
+			runnerEvent: runnerEvent{addr: mr.Addr(), err: ctx.Err()},
+		})
+
 		close(mr.closeChan)
 	}
 	return nil
