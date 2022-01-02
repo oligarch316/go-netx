@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/oligarch316/go-netx"
-	"github.com/oligarch316/go-netx/multi/addrsort"
 	"github.com/oligarch316/go-netx/serverx"
 )
 
@@ -83,9 +82,4 @@ func WithResolveTLSSchemeName(name string) TransportOption {
 // WithResolveHostName TODO.
 func WithResolveHostName(name string) TransportOption {
 	return func(p *TransportParams) { p.HostName = &name }
-}
-
-// WithResolveAddressOrder TODO.
-func WithResolveAddressOrder(cmps ...addrsort.Comparer) TransportOption {
-	return func(p *TransportParams) { p.AddressOrder = cmps }
 }

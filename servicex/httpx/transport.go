@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/oligarch316/go-netx/multi/addrsort"
+	"github.com/oligarch316/go-netx"
 	"github.com/oligarch316/go-netx/serverx"
 	"github.com/oligarch316/go-netx/servicex"
 )
@@ -20,21 +20,16 @@ type TransportOption func(*TransportParams)
 // TransportParams TODO.
 type TransportParams struct {
 	HostName, SchemeName, SchemeTLSName *string
-	AddressOrder                        addrsort.Ordering
 	HTTPTransportOptions                []func(*http.Transport)
 }
 
 func defaultTransportParams() TransportParams {
-	var (
-		schemeName = servicex.DefaultDialKey
-		cmp        = servicex.DefaultDialNetworkPriority
-	)
+	schemeName := servicex.DefaultDialKey
 
 	return TransportParams{
 		HostName:             nil,
 		SchemeTLSName:        nil,
 		SchemeName:           &schemeName,
-		AddressOrder:         addrsort.Ordering{cmp},
 		HTTPTransportOptions: nil,
 	}
 }
@@ -56,15 +51,15 @@ type Transport interface {
 
 // LoadTransport TODO.
 func LoadTransport(svr *serverx.Server, opts ...TransportOption) (Transport, error) {
-	set, err := svr.DialSet(ID)
+	dialer, err := svr.Dialer(ID)
 	if err != nil {
 		return nil, err
 	}
-	return NewTransport(set, opts...), nil
+	return NewTransport(dialer, opts...), nil
 }
 
 // NewTransport TODO.
-func NewTransport(set *serverx.DialSet, opts ...TransportOption) Transport {
+func NewTransport(dialer netx.Dialer, opts ...TransportOption) Transport {
 	params := defaultTransportParams()
 	for _, opt := range opts {
 		opt(&params)
@@ -72,15 +67,13 @@ func NewTransport(set *serverx.DialSet, opts ...TransportOption) Transport {
 
 	var (
 		baseTransport = params.build()
-		dialFact      = newDialFactory(set, params.AddressOrder)
+		hooks         = dialHooks{
+			dial:        baseTransport.Dial,
+			dialContext: baseTransport.DialContext,
+		}
 	)
 
-	hooks := dialHooks{
-		dial:        baseTransport.Dial,
-		dialContext: baseTransport.DialContext,
-	}
-
-	baseTransport.DialContext = dialFact.wrap(hooks.DialContext)
+	baseTransport.DialContext = wrapDialContext(dialer, hooks.DialContext)
 
 	// TODO: Only in go 1.14
 	// if baseTransport.DialTLSContext != nil || baseTransport.DialTLS != nil {
@@ -89,7 +82,7 @@ func NewTransport(set *serverx.DialSet, opts ...TransportOption) Transport {
 	//         dialContext: baseTransport.DialTLSContext,
 	//     }
 	//
-	//     baseTransport.DialTLSContext = dialFact.wrap(hooks.DialContext)
+	//     baseTransport.DialTLSContext = wrapDialContext(dialer, hooks.DialContext)
 	// }
 
 	var res Transport = baseTransport

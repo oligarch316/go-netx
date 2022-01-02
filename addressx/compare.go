@@ -1,20 +1,20 @@
-package addrsort
+package addressx
 
-import "github.com/oligarch316/go-netx/multi"
+import "net"
 
 // Comparer TODO.
-type Comparer func(x, y multi.Addr) (less, equal bool)
+type Comparer func(x, y net.Addr) (less, equal bool)
 
 // ----- Lexographic
 
 // ByLexAddress TODO.
-func ByLexAddress(x, y multi.Addr) (bool, bool) {
+func ByLexAddress(x, y net.Addr) (bool, bool) {
 	xStr, yStr := x.String(), y.String()
 	return xStr < yStr, xStr == yStr
 }
 
 // ByLexNetwork TODO.
-func ByLexNetwork(x, y multi.Addr) (bool, bool) {
+func ByLexNetwork(x, y net.Addr) (bool, bool) {
 	xNet, yNet := x.Network(), y.Network()
 	return xNet < yNet, xNet == yNet
 }
@@ -24,13 +24,13 @@ func ByLexNetwork(x, y multi.Addr) (bool, bool) {
 // ByPriorityAddress TODO.
 func ByPriorityAddress(addresses ...string) Comparer {
 	pMap := newPriorityMap(addresses)
-	return func(x, y multi.Addr) (bool, bool) { return pMap.compare(x.String(), y.String()) }
+	return func(x, y net.Addr) (bool, bool) { return pMap.compare(x.String(), y.String()) }
 }
 
 // ByPriorityNetwork TODO.
 func ByPriorityNetwork(networks ...string) Comparer {
 	pMap := newPriorityMap(networks)
-	return func(x, y multi.Addr) (bool, bool) { return pMap.compare(x.Network(), y.Network()) }
+	return func(x, y net.Addr) (bool, bool) { return pMap.compare(x.Network(), y.Network()) }
 }
 
 type priorityMap map[string]int

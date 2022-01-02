@@ -74,13 +74,7 @@ func TestServerDependencyCycles(t *testing.T) {
 
 		t.Run(subtest.name, func(t *testing.T) {
 			t.Parallel()
-
-			params := newServiceParams()
-			for k, v := range subtest.deps {
-				params.appendDependencies(k, v...)
-			}
-
-			assert.Equal(t, subtest.expected, findDependencyCycles(params))
+			assert.Equal(t, subtest.expected, cycleCheck(subtest.deps))
 		})
 	}
 }

@@ -1,24 +1,32 @@
 package serverx
 
-import "github.com/oligarch316/go-netx"
+import (
+	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/listenerx/multi"
+)
 
 // WithListeners TODO.
 func WithListeners(id netx.ServiceID, ls ...netx.Listener) Option {
-	return func(p *Params) { p.appendListeners(id, ls...) }
+	return func(p *Params) { p.Services.AppendListeners(id, ls...) }
+}
+
+// WithListenerOpts TODO.
+func WithListenerOpts(id netx.ServiceID, opts ...multi.ListenerOption) Option {
+	return func(p *Params) { p.Services.AppendListenerOpts(id, opts...) }
 }
 
 // WithDependencies TODO.
 func WithDependencies(id netx.ServiceID, deps ...netx.ServiceID) Option {
-	return func(p *Params) { p.appendDependencies(id, deps...) }
+	return func(p *Params) { p.Services.AppendDependencies(id, deps...) }
 }
 
 // WithIgnoreAll TODO.
 func WithIgnoreAll() Option {
 	return func(p *Params) {
-		p.IgnoreParams = IgnoreParams{
-			IgnoreMissingListeners:    true,
-			IgnoreDuplicateServices:   true,
-			IgnoreMissingDependencies: true,
+		p.Ignore = IgnoreParams{
+			DuplicateServices:   true,
+			MissingDependencies: true,
+			MissingListeners:    true,
 		}
 	}
 }

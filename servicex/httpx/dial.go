@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/oligarch316/go-netx/multi"
-	"github.com/oligarch316/go-netx/multi/addrsort"
-	"github.com/oligarch316/go-netx/serverx"
+	"github.com/oligarch316/go-netx"
 )
 
 var dialLocalHostKey = fmt.Sprintf("_%s_:0", ID)
@@ -42,22 +40,10 @@ func (dh dialHooks) DialContext(ctx context.Context, network, addr string) (net.
 	return res, err
 }
 
-type dialFactory struct {
-	hashes []multi.Hash
-	set    *serverx.DialSet
-}
-
-func newDialFactory(set *serverx.DialSet, cmps []addrsort.Comparer) dialFactory {
-	return dialFactory{
-		hashes: set.Resolve(cmps...),
-		set:    set,
-	}
-}
-
-func (df dialFactory) wrap(f dialContextFunc) dialContextFunc {
+func wrapDialContext(dialer netx.Dialer, f dialContextFunc) dialContextFunc {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		if addr == dialLocalHostKey {
-			return df.set.DialContext(ctx, df.hashes...)
+			return dialer.DialContext(ctx)
 		}
 		return f(ctx, network, addr)
 	}
