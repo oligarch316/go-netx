@@ -53,7 +53,12 @@ type dialSet struct {
 	listeners []netx.Listener
 }
 
-func newDialSet() dialSet { return dialSet{id: atomic.AddUint32(&gSetID, 1)} }
+func newDialSet(listeners []netx.Listener) *dialSet {
+	return &dialSet{
+		id:        atomic.AddUint32(&gSetID, 1),
+		listeners: listeners,
+	}
+}
 
 func (ds dialSet) lookup(hash SetHash) (netx.Listener, error) {
 	hID, hIdx := hash.id(), hash.idx()
@@ -81,7 +86,7 @@ func (ds dialSet) Addrs() []SetAddr {
 	return res
 }
 
-func (ds dialSet) Dial(hash SetHash) (net.Conn, error) {
+func (ds *dialSet) Dial(hash SetHash) (net.Conn, error) {
 	l, err := ds.lookup(hash)
 	if err != nil {
 		return nil, err
@@ -90,7 +95,7 @@ func (ds dialSet) Dial(hash SetHash) (net.Conn, error) {
 	return l.Dial()
 }
 
-func (ds dialSet) DialContext(ctx context.Context, hash SetHash) (net.Conn, error) {
+func (ds *dialSet) DialContext(ctx context.Context, hash SetHash) (net.Conn, error) {
 	l, err := ds.lookup(hash)
 	if err != nil {
 		return nil, err

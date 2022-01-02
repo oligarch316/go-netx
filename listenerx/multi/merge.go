@@ -20,67 +20,67 @@ type mergeAddr struct{}
 func (mergeAddr) Network() string { return mergeAddrNetwork }
 func (mergeAddr) String() string  { return mergeAddrNetwork }
 
-type mergeListenerChannels struct {
-	conn  chan net.Conn
-	close chan struct{}
-}
-
 type mergeListener struct {
-	mergeListenerChannels
+	connChan  chan net.Conn
+	closeChan chan struct{}
 	closeOnce sync.Once
 }
 
-func newMergeListener() mergeListener {
-	channels := mergeListenerChannels{
-		conn:  make(chan net.Conn),
-		close: make(chan struct{}),
+func newMergeListener() *mergeListener {
+	return &mergeListener{
+		connChan:  make(chan net.Conn),
+		closeChan: make(chan struct{}),
 	}
-
-	return mergeListener{mergeListenerChannels: channels}
 }
 
-func (*mergeListener) Addr() net.Addr { return mergeAddr{} }
+func (mergeListener) Addr() net.Addr { return mergeAddr{} }
 
 func (ml *mergeListener) Accept() (net.Conn, error) {
 	select {
-	case conn := <-ml.conn:
+	case conn := <-ml.connChan:
 		return conn, nil
-	case <-ml.close:
+	case <-ml.closeChan:
 		return nil, net.ErrClosed
 	}
 }
 
 func (ml *mergeListener) Close() error {
-	ml.closeOnce.Do(func() { close(ml.close) })
+	ml.closeOnce.Do(func() { close(ml.closeChan) })
 	return nil
 }
 
-type mergeRunner struct {
-	l net.Listener
-
-	mlChannels mergeListenerChannels
-	doneChan   chan struct{}
-	closeChan  chan struct{}
+// RunnerParams TODO.
+type RunnerParams struct {
+	// TODO
 }
 
-func newMergeRunner(l net.Listener, mlChannels mergeListenerChannels) *mergeRunner {
-	return &mergeRunner{
-		l:          l,
-		mlChannels: mlChannels,
-		doneChan:   make(chan struct{}),
-		closeChan:  make(chan struct{}),
+// MergeRunner TODO.
+type MergeRunner struct {
+	source net.Listener
+	sink   *mergeListener
+
+	doneChan  chan struct{}
+	closeChan chan struct{}
+}
+
+func newMergeRunner(params RunnerParams, source net.Listener, sink *mergeListener) *MergeRunner {
+	return &MergeRunner{
+		source:    source,
+		sink:      sink,
+		doneChan:  make(chan struct{}),
+		closeChan: make(chan struct{}),
 	}
 }
 
-func (mr mergeRunner) Addr() net.Addr { return mr.l.Addr() }
+func (mr MergeRunner) Addr() net.Addr { return mr.source.Addr() }
 
-func (mr *mergeRunner) Run() error {
+func (mr *MergeRunner) Run() error {
 	defer close(mr.doneChan)
 
 	delay := newRetryDelay()
 
 	for {
-		conn, err := mr.l.Accept()
+		conn, err := mr.source.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				// Expected close error (happy path) => return nil
@@ -102,7 +102,7 @@ func (mr *mergeRunner) Run() error {
 			case <-mr.closeChan:
 				// Runner was closed
 				return fmt.Errorf("interrupted retry: %w", errMergeRunnerClosed)
-			case <-mr.mlChannels.close:
+			case <-mr.sink.closeChan:
 				// Target merge listener was closed
 				return fmt.Errorf("interrupted retry: %w", errMergeListenerClosed)
 			}
@@ -111,7 +111,7 @@ func (mr *mergeRunner) Run() error {
 		delay.Reset()
 
 		select {
-		case mr.mlChannels.conn <- conn:
+		case mr.sink.connChan <- conn:
 			// Connection was successfully handed off, continue
 		case <-mr.closeChan:
 			// Runner was closed
@@ -119,7 +119,7 @@ func (mr *mergeRunner) Run() error {
 				// TODO: Log/track/surface this somehow
 			}
 			return fmt.Errorf("unprocessed connection: %w", errMergeRunnerClosed)
-		case <-mr.mlChannels.close:
+		case <-mr.sink.closeChan:
 			// Target merge listener was closed
 			if err := conn.Close(); err != nil {
 				// TODO: Log/track/surface this somehow
@@ -129,8 +129,8 @@ func (mr *mergeRunner) Run() error {
 	}
 }
 
-func (mr *mergeRunner) Close(ctx context.Context) error {
-	if err := mr.l.Close(); err != nil {
+func (mr *MergeRunner) Close(ctx context.Context) error {
+	if err := mr.source.Close(); err != nil {
 		// TODO: Log/track/surface this somehow
 		close(mr.closeChan)
 		return nil

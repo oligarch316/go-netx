@@ -7,11 +7,11 @@ import (
 	"github.com/oligarch316/go-netx"
 )
 
-type idList []netx.ServiceID
+type cycleIDList []netx.ServiceID
 
-func (il idList) Len() int           { return len(il) }
-func (il idList) Swap(i, j int)      { il[i], il[j] = il[j], il[i] }
-func (il idList) Less(i, j int) bool { return il[i].String() < il[j].String() }
+func (cil cycleIDList) Len() int           { return len(cil) }
+func (cil cycleIDList) Swap(i, j int)      { cil[i], cil[j] = cil[j], cil[i] }
+func (cil cycleIDList) Less(i, j int) bool { return cil[i].String() < cil[j].String() }
 
 type cycleError []netx.ServiceID
 
@@ -30,7 +30,7 @@ func (ce cycleError) Error() string {
 	return strings.Join(reversed, " → ")
 }
 
-func findDependencyCycles(params ServiceParams) error {
+func cycleCheck(depMap map[netx.ServiceID][]netx.ServiceID) error {
 	var (
 		visited = make(map[netx.ServiceID]bool)
 		recurse func(netx.ServiceID) cycleError
@@ -48,36 +48,30 @@ func findDependencyCycles(params ServiceParams) error {
 		visited[svcID] = false
 		defer func() { visited[svcID] = true }()
 
-		if param, ok := params.services[svcID]; ok {
-			depIDs := make(idList, 0, len(param.deps))
-			for depID := range param.deps {
-				depIDs = append(depIDs, depID)
-			}
+		depIDs := cycleIDList(depMap[svcID])
+		sort.Stable(depIDs)
 
-			sort.Stable(depIDs)
-
-			for _, depID := range depIDs {
-				if err := recurse(depID); err != nil {
-					if err.complete() {
-						return err
-					}
-					return append(err, svcID)
+		for _, depID := range depIDs {
+			if err := recurse(depID); err != nil {
+				if err.complete() {
+					return err
 				}
+				return append(err, svcID)
 			}
 		}
 
 		return nil
 	}
 
-	svcIDs := make(idList, 0, len(params.services))
-	for svcID := range params.services {
-		svcIDs = append(svcIDs, svcID)
+	rootIDs := make(cycleIDList, 0, len(depMap))
+	for rootID := range depMap {
+		rootIDs = append(rootIDs, rootID)
 	}
 
-	sort.Stable(svcIDs)
+	sort.Stable(rootIDs)
 
-	for _, svcID := range svcIDs {
-		if err := recurse(svcID); err != nil {
+	for _, rootID := range rootIDs {
+		if err := recurse(rootID); err != nil {
 			return err
 		}
 	}

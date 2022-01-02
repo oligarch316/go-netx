@@ -6,35 +6,52 @@ import (
 	"github.com/oligarch316/go-netx"
 )
 
+// ListenerOption TODO.
+type ListenerOption func(*ListenerParams)
+
+// ListenerParams TODO.
+type ListenerParams struct {
+	DialerParams
+	RunnerParams
+}
+
+func defaultListenerParams() ListenerParams {
+	return ListenerParams{
+		// TODO
+	}
+}
+
 // Listener TODO.
 type Listener struct {
 	*Dialer
-	mergeListener
+	*mergeListener
+
+	runnerParams RunnerParams
 }
 
 // NewListener TODO.
-func NewListener(ls ...netx.Listener) *Listener {
-	res := &Listener{
-		Dialer:        newDialer(),
-		mergeListener: newMergeListener(),
+func NewListener(ls []netx.Listener, opts ...ListenerOption) *Listener {
+	params := defaultListenerParams()
+	for _, opt := range opts {
+		opt(&params)
 	}
 
-	res.Append(ls...)
-	return res
+	return &Listener{
+		Dialer:        newDialer(params.DialerParams, ls),
+		mergeListener: newMergeListener(),
+		runnerParams:  params.RunnerParams,
+	}
 }
-
-// Append TODO.
-func (l *Listener) Append(ls ...netx.Listener) { l.set.listeners = append(l.set.listeners, ls...) }
 
 // Runners TODO.
-func (l *Listener) Runners() []*mergeRunner {
-	res := make([]*mergeRunner, l.Len())
+func (l *Listener) Runners() []*MergeRunner {
+	res := make([]*MergeRunner, l.Len())
 
 	for i, item := range l.set.listeners {
-		res[i] = newMergeRunner(item, l.mergeListenerChannels)
+		res[i] = newMergeRunner(l.runnerParams, item, l.mergeListener)
 	}
 
 	return res
 }
 
-func (l *Listener) String() string { return fmt.Sprintf("multi listener %d", l.SetID()) }
+func (l *Listener) String() string { return fmt.Sprintf("multi listener %d", l.set.id) }

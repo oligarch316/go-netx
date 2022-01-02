@@ -10,57 +10,15 @@ import (
 	"github.com/oligarch316/go-netx/servicex"
 )
 
-type dependencySet map[netx.ServiceID]struct{}
-
-func (ds dependencySet) Append(ids ...netx.ServiceID) {
-	for _, id := range ids {
-		ds[id] = struct{}{}
-	}
-}
-
-type serviceParamData struct {
-	listener *multi.Listener
-	deps     dependencySet
-}
-
-// ServiceParams TODO.
-type ServiceParams struct {
-	services map[netx.ServiceID]*serviceParamData
-}
-
-func newServiceParams() ServiceParams {
-	return ServiceParams{services: make(map[netx.ServiceID]*serviceParamData)}
-}
-
-func (sp *ServiceParams) requireData(id netx.ServiceID) *serviceParamData {
-	res, ok := sp.services[id]
-	if !ok {
-		res = &serviceParamData{
-			listener: multi.NewListener(),
-			deps:     make(dependencySet),
-		}
-		sp.services[id] = res
-	}
-	return res
-}
-
-func (sp *ServiceParams) appendListeners(id netx.ServiceID, ls ...netx.Listener) {
-	sp.requireData(id).listener.Append(ls...)
-}
-
-func (sp *ServiceParams) appendDependencies(id netx.ServiceID, depIDs ...netx.ServiceID) {
-	sp.requireData(id).deps.Append(depIDs...)
-}
-
-type waitGroup interface {
+type serviceWG interface {
 	Done()
 	Wait()
 }
 
-type noopWaitGroup struct{}
+type serviceNoopWG struct{}
 
-func (noopWaitGroup) Done() {}
-func (noopWaitGroup) Wait() {}
+func (serviceNoopWG) Done() {}
+func (serviceNoopWG) Wait() {}
 
 type service struct {
 	svc netx.Service
@@ -91,8 +49,8 @@ func (s *service) Runners() []runner.Item {
 	// ----- "Glue" runners
 	// > wait groups for synchronization purposes
 	var (
-		dependantsWG waitGroup = noopWaitGroup{}
-		listenersWG  waitGroup = noopWaitGroup{}
+		dependantsWG serviceWG = serviceNoopWG{}
+		listenersWG  serviceWG = serviceNoopWG{}
 	)
 
 	if len(s.dependants) > 0 {

@@ -4,15 +4,21 @@ import (
 	"context"
 	"errors"
 	"net"
+
+	"github.com/oligarch316/go-netx"
 )
 
+// DialerParams TODO.
+type DialerParams struct {
+	// TODO
+}
+
 // Dialer TODO.
-type Dialer struct{ set dialSet }
+type Dialer struct{ set *dialSet }
 
-func newDialer() *Dialer { return &Dialer{set: newDialSet()} }
-
-// SetID TODO.
-func (d *Dialer) SetID() uint32 { return d.set.id }
+func newDialer(params DialerParams, ls []netx.Listener) *Dialer {
+	return &Dialer{set: newDialSet(ls)}
+}
 
 // Len TODO.
 func (d *Dialer) Len() int { return len(d.set.listeners) }
