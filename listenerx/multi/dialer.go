@@ -2,22 +2,27 @@ package multi
 
 import (
 	"context"
-	"errors"
 	"net"
+	"sort"
 
 	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/addressx"
 )
 
 // DialerParams TODO.
 type DialerParams struct {
-	// TODO
+	AddressOrdering addressx.Ordering
+	Strategy        DialStrategy
 }
 
 // Dialer TODO.
-type Dialer struct{ set *dialSet }
+type Dialer struct {
+	params DialerParams
+	set    *dialSet
+}
 
 func newDialer(params DialerParams, ls []netx.Listener) *Dialer {
-	return &Dialer{set: newDialSet(ls)}
+	return &Dialer{params: params, set: newDialSet(ls)}
 }
 
 // Len TODO.
@@ -27,7 +32,9 @@ func (d *Dialer) Len() int { return len(d.set.listeners) }
 func (d *Dialer) Resolve() []SetAddr {
 	res := d.set.Addrs()
 
-	// TODO: Order by addressx.Ordering parameter
+	sort.SliceStable(res, func(i, j int) bool {
+		return d.params.AddressOrdering.Less(res[i], res[j])
+	})
 
 	return res
 }
@@ -44,10 +51,10 @@ func (d *Dialer) DialContextHash(ctx context.Context, hash SetHash) (net.Conn, e
 
 // Dial TODO.
 func (d *Dialer) Dial() (net.Conn, error) {
-	return nil, errors.New("not yet implemented")
+	return d.DialContext(context.Background())
 }
 
 // DialContext TODO.
 func (d *Dialer) DialContext(ctx context.Context) (net.Conn, error) {
-	return nil, errors.New("not yet implemented")
+	return d.params.Strategy(ctx, d.Resolve(), d.DialContextHash)
 }

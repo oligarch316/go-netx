@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/oligarch316/go-netx"
+	"github.com/oligarch316/go-netx/addressx"
+	"github.com/oligarch316/go-netx/listenerx"
 	"github.com/oligarch316/go-netx/listenerx/retry"
 )
 
@@ -20,7 +22,10 @@ type ListenerParams struct {
 func defaultListenerParams() ListenerParams {
 	return ListenerParams{
 		DialerParams: DialerParams{
-			// TODO
+			AddressOrdering: addressx.Ordering{
+				addressx.ByPriorityNetwork(listenerx.InternalNetwork, "unix", "tcp"),
+			},
+			Strategy: DialStrategyFirstOnly,
 		},
 		RunnerParams: RunnerParams{
 			AcceptRetryDelay: retry.DelayFuncExponential(5*time.Millisecond, 1*time.Second, 2),
