@@ -15,19 +15,19 @@ type ListenerOption func(*ListenerParams)
 
 // ListenerParams TODO.
 type ListenerParams struct {
-	DialerParams
-	RunnerParams
+	Dialer DialerParams
+	Runner RunnerParams
 }
 
 func defaultListenerParams() ListenerParams {
 	return ListenerParams{
-		DialerParams: DialerParams{
+		Dialer: DialerParams{
 			AddressOrdering: addressx.Ordering{
 				addressx.ByPriorityNetwork(listenerx.InternalNetwork, "unix", "tcp"),
 			},
 			Strategy: DialStrategyFirstOnly,
 		},
-		RunnerParams: RunnerParams{
+		Runner: RunnerParams{
 			AcceptRetryDelay: retry.DelayFuncExponential(5*time.Millisecond, 1*time.Second, 2),
 			EventHandler:     func(RunnerEvent) {},
 		},
@@ -50,9 +50,9 @@ func NewListener(ls []netx.Listener, opts ...ListenerOption) *Listener {
 	}
 
 	return &Listener{
-		Dialer:        newDialer(params.DialerParams, ls),
+		Dialer:        newDialer(params.Dialer, ls),
 		mergeListener: newMergeListener(),
-		runnerParams:  params.RunnerParams,
+		runnerParams:  params.Runner,
 	}
 }
 
