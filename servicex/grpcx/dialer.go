@@ -82,7 +82,7 @@ func (dp DialerParams) build(dialSet DialSet) []grpc.DialOption {
 type Dialer struct{ commonOpts []grpc.DialOption }
 
 // LoadDialer TODO.
-func LoadDialer(svr serverx.Server, opts ...DialerOption) (*Dialer, error) {
+func LoadDialer(svr *serverx.Server, opts ...DialerOption) (*Dialer, error) {
 	dialSet, err := svr.Dialer(ID)
 	if err != nil {
 		return nil, err

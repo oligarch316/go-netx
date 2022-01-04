@@ -19,7 +19,7 @@ var (
 func rsvFormatHash(h multi.SetHash) string { return rsvAddrPrefix + h.HashString() }
 
 func rsvParseHash(s string) (local bool, h multi.SetHash, err error) {
-	if local = strings.HasPrefix(rsvAddrPrefix, s); !local {
+	if local = strings.HasPrefix(s, rsvAddrPrefix); !local {
 		return
 	}
 
